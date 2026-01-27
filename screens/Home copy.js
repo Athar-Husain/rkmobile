@@ -1,0 +1,834 @@
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    StyleSheet,
+    Image,
+    FlatList,
+    ScrollView,
+    Dimensions,
+    Modal,
+    Platform,
+} from 'react-native'
+import React, { useState } from 'react'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { images, COLORS, SIZES, icons } from '../constants'
+import { banners, categories, mostPopularServices } from '../data'
+import SubHeaderItem from '../components/SubHeaderItem'
+import Category from '../components/Category'
+import ServiceCard from '../components/ServiceCard'
+import { useTheme } from '../theme/ThemeProvider'
+import Header from '../containers/Header'
+import WelcomeAndConnection from '../containers/WelcomeAndConnection'
+
+const BOTTOM_NAV_HEIGHT = Platform.OS === 'ios' ? 90 : 60
+
+// Constants for layout
+const { width } = Dimensions.get('window')
+const CARD_WIDTH = (width - 48) / 2
+
+// Refined Overview Data with a more professional color palette
+const overviewData = [
+    {
+        title: 'Active Connections',
+        value: 3,
+        icon: icons.wifi,
+        bg: COLORS.primary,
+    },
+    {
+        title: 'Monthly Bill',
+        value: '$42.00',
+        icon: icons.wallet,
+        bg: '#6C63FF',
+    },
+    {
+        title: 'Pending Balance',
+        value: '$10.00',
+        icon: icons.infoCircle,
+        bg: '#FF6B6B',
+    },
+    {
+        title: 'Subscribed Plan',
+        value: 'Pro Max',
+        icon: icons.box,
+        bg: '#3DD598',
+    },
+    {
+        title: 'Open Tickets',
+        value: 1,
+        icon: icons.ticket,
+        bg: '#FEC260',
+    },
+    {
+        title: 'Last Payment',
+        value: '$32.00',
+        icon: icons.check,
+        bg: '#4D9DE0',
+    },
+]
+
+// Sample data for featured plans
+const featuredPlansData = [
+    {
+        id: '1',
+        name: 'Pro Plan',
+        speed: '100 Mbps',
+        description: 'Best for professionals',
+        price: 50,
+    },
+    {
+        id: '2',
+        name: 'Business Plan',
+        speed: '200 Mbps',
+        description: 'Ideal for businesses',
+        price: 80,
+    },
+    {
+        id: '3',
+        name: 'Ultra Plan',
+        speed: '300 Mbps',
+        description: 'For heavy usage',
+        price: 100,
+    },
+    {
+        id: '4',
+        name: 'Mega Plan',
+        speed: '500 Mbps',
+        description: 'Ultimate speed',
+        price: 150,
+    },
+    {
+        id: '5',
+        name: 'Lite Plan',
+        speed: '50 Mbps',
+        description: 'Budget friendly',
+        price: 30,
+    },
+]
+
+const Home = ({ navigation }) => {
+    const [currentIndex, setCurrentIndex] = useState(0)
+    const [modalVisible, setModalVisible] = useState(false)
+    const { dark, colors } = useTheme()
+
+    // Connection data can be managed in a state or context
+    const [selectedConnection, setSelectedConnection] = useState('Home WiFi')
+    const connectionDetails = {
+        name: selectedConnection,
+        status: 'Active',
+        ipAddress: '192.168.0.101',
+        speed: '150 Mbps',
+        dataUsed: '120 GB',
+    }
+
+    // Function to handle switching connections from the modal
+    const handleSwitchConnection = () => {
+        setModalVisible(false) // Close the current modal
+        navigation.navigate('Connections', {
+            // Pass the state setter function to the Connections screen
+            onConnectionSelected: setSelectedConnection,
+        })
+    }
+
+    // --- Render Functions ---
+
+    // Header component for a cleaner look
+    const renderHeader = () => {
+        return (
+            <View style={styles.headerContainer}>
+                <View style={styles.headerLeft}>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('Profile')}
+                    >
+                        <Image
+                            source={images.user5}
+                            resizeMode="cover"
+                            style={styles.avatar}
+                        />
+                    </TouchableOpacity>
+                    <Text
+                        style={[
+                            styles.username,
+                            {
+                                color: dark
+                                    ? COLORS.white
+                                    : COLORS.greyscale900,
+                            },
+                        ]}
+                    >
+                        Hi, Joanna!
+                    </Text>
+                </View>
+                <TouchableOpacity
+                    onPress={() => navigation.navigate('Notifications')}
+                >
+                    <Image
+                        source={icons.bell}
+                        resizeMode="contain"
+                        style={[
+                            styles.bellIcon,
+                            {
+                                tintColor: dark
+                                    ? COLORS.white
+                                    : COLORS.greyscale900,
+                            },
+                        ]}
+                    />
+                    <View style={styles.noti} />
+                </TouchableOpacity>
+            </View>
+        )
+    }
+
+    // A clean, simple banner with dots
+    const renderBanner = () => {
+        return (
+            <View style={styles.bannerSection}>
+                <FlatList
+                    data={banners}
+                    renderItem={({ item }) => (
+                        <View style={styles.bannerContainer}>
+                            <View>
+                                <Text style={styles.bannerTopTitle}>
+                                    {item.discountName}
+                                </Text>
+                                <Text style={styles.bannerTopSubtitle}>
+                                    {item.bottomSubtitle}
+                                </Text>
+                            </View>
+                            <Text style={styles.bannerDiscount}>
+                                {item.discount} OFF
+                            </Text>
+                        </View>
+                    )}
+                    keyExtractor={(item) => item.id.toString()}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    onMomentumScrollEnd={(event) => {
+                        const newIndex = Math.round(
+                            event.nativeEvent.contentOffset.x / (width - 32)
+                        )
+                        setCurrentIndex(newIndex)
+                    }}
+                />
+                <View style={styles.dotContainer}>
+                    {banners.map((_, index) => (
+                        <View
+                            key={index}
+                            style={[
+                                styles.dot,
+                                index === currentIndex
+                                    ? styles.activeDot
+                                    : null,
+                            ]}
+                        />
+                    ))}
+                </View>
+            </View>
+        )
+    }
+
+    // Welcome and Connection Info section
+    const renderWelcomeAndConnection = () => {
+        return (
+            <View style={styles.welcomeContainer}>
+                <Text
+                    style={[
+                        styles.welcomeText,
+                        { color: dark ? COLORS.white : COLORS.greyscale900 },
+                    ]}
+                >
+                    Welcome back,
+                    <Text style={styles.boldUsername}> Joanna</Text>
+                </Text>
+                <TouchableOpacity
+                    onPress={() => setModalVisible(true)}
+                    style={[
+                        styles.connectionDropdown,
+                        {
+                            borderColor: dark
+                                ? COLORS.dark3
+                                : COLORS.greyscale300,
+                        },
+                    ]}
+                >
+                    <Text
+                        style={[
+                            styles.connectionText,
+                            {
+                                color: dark
+                                    ? COLORS.white
+                                    : COLORS.greyscale700,
+                            },
+                        ]}
+                    >
+                        {selectedConnection} ⌄
+                    </Text>
+                </TouchableOpacity>
+            </View>
+        )
+    }
+
+    // Updated Modal with a new navigation option
+    const renderConnectionModal = () => {
+        return (
+            <Modal
+                animationType="fade"
+                transparent={true}
+                visible={modalVisible}
+                onRequestClose={() => setModalVisible(false)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPressOut={() => setModalVisible(false)}
+                >
+                    <View
+                        style={[
+                            styles.modalContainer,
+                            {
+                                backgroundColor: dark
+                                    ? COLORS.dark2
+                                    : COLORS.white,
+                            },
+                        ]}
+                    >
+                        <Text
+                            style={[
+                                styles.modalTitle,
+                                {
+                                    color: dark
+                                        ? COLORS.white
+                                        : COLORS.greyscale900,
+                                },
+                            ]}
+                        >
+                            {selectedConnection}
+                        </Text>
+                        <View style={styles.modalDetailRow}>
+                            <Text
+                                style={[
+                                    styles.modalDetailLabel,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale700,
+                                    },
+                                ]}
+                            >
+                                Status:
+                            </Text>
+                            <Text
+                                style={[
+                                    styles.modalDetailValue,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale900,
+                                    },
+                                ]}
+                            >
+                                {connectionDetails.status}
+                            </Text>
+                        </View>
+                        <View style={styles.modalDetailRow}>
+                            <Text
+                                style={[
+                                    styles.modalDetailLabel,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale700,
+                                    },
+                                ]}
+                            >
+                                IP Address:
+                            </Text>
+                            <Text
+                                style={[
+                                    styles.modalDetailValue,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale900,
+                                    },
+                                ]}
+                            >
+                                {connectionDetails.ipAddress}
+                            </Text>
+                        </View>
+                        <View style={styles.modalDetailRow}>
+                            <Text
+                                style={[
+                                    styles.modalDetailLabel,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale700,
+                                    },
+                                ]}
+                            >
+                                Speed:
+                            </Text>
+                            <Text
+                                style={[
+                                    styles.modalDetailValue,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale900,
+                                    },
+                                ]}
+                            >
+                                {connectionDetails.speed}
+                            </Text>
+                        </View>
+                        <View style={styles.modalDetailRow}>
+                            <Text
+                                style={[
+                                    styles.modalDetailLabel,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale700,
+                                    },
+                                ]}
+                            >
+                                Data Used:
+                            </Text>
+                            <Text
+                                style={[
+                                    styles.modalDetailValue,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale900,
+                                    },
+                                ]}
+                            >
+                                {connectionDetails.dataUsed}
+                            </Text>
+                        </View>
+
+                        {/* New Button to navigate to Connections screen */}
+                        <TouchableOpacity
+                            style={styles.manageButton}
+                            onPress={handleSwitchConnection}
+                        >
+                            <Text style={styles.manageButtonText}>
+                                Switch or Manage Connections
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.closeButton,
+                                {
+                                    backgroundColor: dark
+                                        ? COLORS.dark3
+                                        : '#E0E0E0',
+                                },
+                            ]}
+                            onPress={() => setModalVisible(false)}
+                        >
+                            <Text
+                                style={[
+                                    styles.closeButtonText,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.black,
+                                    },
+                                ]}
+                            >
+                                Close
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+        )
+    }
+
+    // Overview Cards section
+    const renderOverviewCards = () => {
+        return (
+            <View>
+                <SubHeaderItem title="Overview" navTitle="" />
+                <FlatList
+                    data={overviewData}
+                    keyExtractor={(item, index) => index.toString()}
+                    numColumns={3}
+                    scrollEnabled={false}
+                    columnWrapperStyle={styles.overviewRow}
+                    renderItem={({ item }) => (
+                        <View
+                            style={[
+                                styles.overviewCard,
+                                { backgroundColor: item.bg },
+                            ]}
+                        >
+                            <Image
+                                source={item.icon}
+                                style={styles.overviewIcon}
+                            />
+                            <Text style={styles.overviewValue}>
+                                {item.value}
+                            </Text>
+                            <Text style={styles.overviewTitle}>
+                                {item.title}
+                            </Text>
+                        </View>
+                    )}
+                />
+            </View>
+        )
+    }
+
+    // Featured Plans Section with simplified horizontal scroll
+    const renderFeaturedPlansSection = () => {
+        return (
+            <View>
+                <SubHeaderItem
+                    title="Featured Plans"
+                    navTitle="See all"
+                    onPress={() => navigation.navigate('Plans')}
+                />
+                <FlatList
+                    data={featuredPlansData}
+                    horizontal
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item }) => (
+                        <View
+                            style={[
+                                styles.featuredCard,
+                                {
+                                    width: CARD_WIDTH,
+                                    backgroundColor: dark
+                                        ? COLORS.dark3
+                                        : COLORS.white,
+                                },
+                            ]}
+                        >
+                            <Text
+                                style={[
+                                    styles.featuredName,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale900,
+                                    },
+                                ]}
+                            >
+                                {item.name}
+                            </Text>
+                            <Text style={styles.featuredSpeed}>
+                                {item.speed}
+                            </Text>
+                            <Text
+                                style={[
+                                    styles.featuredDescription,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale700,
+                                    },
+                                ]}
+                            >
+                                {item.description}
+                            </Text>
+                            <Text
+                                style={[
+                                    styles.featuredPrice,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale900,
+                                    },
+                                ]}
+                            >
+                                ${item.price} / month
+                            </Text>
+                        </View>
+                    )}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.featuredListContainer}
+                />
+            </View>
+        )
+    }
+
+    return (
+        <SafeAreaView
+            style={[styles.area, { backgroundColor: colors.background }]}
+        >
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ paddingBottom: BOTTOM_NAV_HEIGHT }}
+                style={styles.container}
+            >
+                {/* {renderHeader()} */}
+                {/* <Header /> */}
+                <Header navigation={navigation} />
+                {renderBanner()}
+                {renderWelcomeAndConnection()}
+                <WelcomeAndConnection />
+                {renderOverviewCards()}
+                {renderFeaturedPlansSection()}
+            </ScrollView>
+            {renderConnectionModal()}
+        </SafeAreaView>
+    )
+}
+
+const styles = StyleSheet.create({
+    area: {
+        flex: 1,
+    },
+    container: {
+        flex: 1,
+        paddingHorizontal: 16,
+    },
+    headerContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingTop: 16,
+        paddingBottom: 8,
+    },
+    headerLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    avatar: {
+        width: 48,
+        height: 48,
+        borderRadius: 20,
+    },
+    username: {
+        fontFamily: 'semiBold',
+        fontSize: 16,
+        marginLeft: 12,
+    },
+    bellIcon: {
+        width: 24,
+        height: 24,
+    },
+    noti: {
+        position: 'absolute',
+        width: 8,
+        height: 8,
+        borderRadius: 8,
+        backgroundColor: COLORS.red,
+        right: 0,
+        top: 0,
+    },
+    // Banner styles
+    bannerSection: {
+        marginBottom: 20,
+    },
+    bannerContainer: {
+        width: width - 32,
+        height: 120,
+        borderRadius: 16,
+        padding: 20,
+        backgroundColor: COLORS.primary,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    bannerTopTitle: {
+        fontFamily: 'semiBold',
+        fontSize: 16,
+        color: COLORS.white,
+    },
+    bannerTopSubtitle: {
+        fontFamily: 'medium',
+        fontSize: 12,
+        color: COLORS.white,
+        marginTop: 4,
+    },
+    bannerDiscount: {
+        fontFamily: 'bold',
+        fontSize: 24,
+        color: COLORS.white,
+    },
+    dotContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: 12,
+    },
+    dot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: COLORS.greyscale400,
+        marginHorizontal: 4,
+    },
+    activeDot: {
+        width: 14,
+        backgroundColor: COLORS.primary,
+    },
+    // Welcome and Connection styles
+    welcomeContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 24,
+        marginBottom: 16,
+    },
+    welcomeText: {
+        fontFamily: 'semiBold',
+        fontSize: 18,
+    },
+    boldUsername: {
+        fontWeight: 'bold',
+    },
+    connectionDropdown: {
+        borderWidth: 1,
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+    },
+    connectionText: {
+        fontFamily: 'medium',
+        fontSize: 13,
+    },
+    // Overview Cards styles
+    overviewRow: {
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    overviewCard: {
+        borderRadius: 12,
+        paddingVertical: 16,
+        paddingHorizontal: 8,
+        alignItems: 'center',
+        flex: 1,
+        marginHorizontal: 4,
+        minWidth: '30%',
+        maxWidth: '31%',
+        aspectRatio: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 3,
+        justifyContent: 'center',
+    },
+    overviewIcon: {
+        width: 24,
+        height: 24,
+        marginBottom: 8,
+        tintColor: COLORS.white,
+    },
+    overviewValue: {
+        fontSize: 20,
+        fontFamily: 'bold',
+        color: COLORS.white,
+    },
+    overviewTitle: {
+        fontSize: 10,
+        fontFamily: 'semiBold',
+        color: COLORS.white,
+        textAlign: 'center',
+        marginTop: 4,
+    },
+    // Featured Plans styles
+    featuredListContainer: {
+        paddingHorizontal: 0,
+    },
+    featuredCard: {
+        borderRadius: 12,
+        padding: 16,
+        marginRight: 12,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowOffset: { width: 0, height: 2 },
+        shadowRadius: 6,
+        elevation: 3,
+        justifyContent: 'space-between',
+        minHeight: 120,
+    },
+    featuredName: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    featuredSpeed: {
+        fontSize: 14,
+        color: COLORS.primary,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    featuredDescription: {
+        fontSize: 13,
+        marginBottom: 8,
+    },
+    featuredPrice: {
+        fontSize: 16,
+        fontWeight: '600',
+    },
+    // Modal styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'flex-end',
+    },
+    modalContainer: {
+        width: '100%',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 24,
+        elevation: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 6,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontFamily: 'bold',
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    modalDetailRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+    },
+    modalDetailLabel: {
+        fontSize: 14,
+        fontFamily: 'medium',
+    },
+    modalDetailValue: {
+        fontSize: 14,
+        fontFamily: 'semiBold',
+    },
+    closeButton: {
+        marginTop: 10,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    closeButtonText: {
+        fontFamily: 'semiBold',
+        fontSize: 16,
+    },
+    manageButton: {
+        marginTop: 24,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center',
+        backgroundColor: COLORS.primary,
+        marginBottom: 10,
+    },
+    manageButtonText: {
+        color: COLORS.white,
+        fontFamily: 'semiBold',
+        fontSize: 16,
+    },
+})
+
+export default Home

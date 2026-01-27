@@ -1,0 +1,21 @@
+project-root/
+├── index.js (NEW - Root entry with background handler)
+├── App.js (Keep as is)
+├── package.json (Update main: "index.js")
+│
+├── hooks/
+│   ├── useNotifications.js (Cleaned version)
+│   └── NotificationPermission.js (Cleaned version)
+│
+├── redux/
+│   ├── store.js (Keep as is)
+│   └── features/
+│       ├── Notifications/
+│       │   ├── NotificationSlice.js (Cleaned version)
+│       │   └── NotificationService.js (Cleaned version)
+│       └── Customers/
+│           ├── CustomerSlice.js (Add login/logout updates)
+│           └── CustomerService.js (Keep as is)
+│
+└── navigations/
+    └── AppNavigation.js (Cleaned version)
