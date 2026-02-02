@@ -11,7 +11,7 @@ import {
 import { useTheme } from '../theme/ThemeProvider'
 import { COLORS } from '../constants'
 import Icon from 'react-native-vector-icons/Ionicons'
-import { switchConnection } from '../redux/features/Customers/CustomerSlice'
+// import { switchConnection } from '../redux/features/Customers/CustomerSlice'
 import { getConnectionsForUser } from '../redux/features/Connection/ConnectionSlice'
 import { useDispatch, useSelector } from 'react-redux'
 import { useFocusEffect } from '@react-navigation/native'

@@ -1,9 +1,10 @@
 import React from 'react'
 import { Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useDispatch } from 'react-redux'
-import { resetOnboarding } from '../redux/features/Customers/CustomerSlice'
+// import { resetOnboarding } from '../redux/features/Customers/CustomerSlice'
 import { useTheme } from '../theme/ThemeProvider'
 import { COLORS } from '../constants'
+import { resetOnboarding } from '../redux/features/Auth/AuthSlice'
 
 const ResetOnboardingButton = ({ label = 'Reset Onboarding', style = {} }) => {
     const dispatch = useDispatch()

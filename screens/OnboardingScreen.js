@@ -9,12 +9,12 @@ import {
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useDispatch } from 'react-redux'
-import { markOnboardingComplete } from '../redux/features/Customers/CustomerSlice'
 import { images, COLORS } from '../constants'
 import { useTheme } from '../theme/ThemeProvider'
 import PageContainer from '../components/PageContainer'
 import Button from '../components/Button'
 import DotsView from '../components/DotsView'
+import { markOnboardingComplete } from '../redux/features/Auth/AuthSlice'
 
 // Get screen dimensions
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')

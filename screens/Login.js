@@ -1,359 +1,373 @@
+import React, { useState, useEffect } from 'react'
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
-    Image,
     Alert,
     TouchableOpacity,
-    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    Image,
 } from 'react-native'
-import React, { useCallback, useEffect, useReducer, useState } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { COLORS, SIZES, icons, images } from '../constants'
-import Header from '../components/Header'
-import { reducer } from '../utils/reducers/formReducers'
-import { validateInput } from '../utils/actions/formActions'
-import Input from '../components/Input'
-import Checkbox from 'expo-checkbox'
-import Button from '../components/Button'
-import SocialButton from '../components/SocialButton'
-import OrSeparator from '../components/OrSeparator'
-import { useTheme } from '../theme/ThemeProvider'
+import { useNavigation } from '@react-navigation/native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { CommonActions } from '@react-navigation/native'
 import { useDispatch, useSelector } from 'react-redux'
+import { useForm, Controller } from 'react-hook-form'
+import Checkbox from 'expo-checkbox'
+import { OtpInput } from 'react-native-otp-entry' // For the smooth UX
+
+// Components
+import Header from '../components/Header'
+import Input from '../components/Input'
+import Button from '../components/Button'
+
+// Constants & Theme
+import { COLORS, icons, images } from '../constants'
+import { useTheme } from '../theme/ThemeProvider'
+
+// Redux
 import {
-    loginCustomer,
-    resetCustomerState,
-} from '../redux/features/Customers/CustomerSlice'
+    signinSendOTP,
+    signinVerifyOTP,
+    clearError,
+} from '../redux/features/Auth/AuthSlice'
+import { FCMService } from '../redux/features/Auth/AuthService'
 
-const isTestMode = false
-
-const initialState = {
-    inputValues: {
-        email: isTestMode ? 'example@gmail.com' : '',
-        password: isTestMode ? '**********' : '',
-    },
-    inputValidities: {
-        email: isTestMode ? true : false,
-        password: isTestMode ? true : false,
-    },
-    formIsValid: isTestMode ? true : false,
-}
-
-const Login = ({ navigation }) => {
-    const [formState, dispatchFormState] = useReducer(reducer, initialState)
-    const [isChecked, setChecked] = useState(false)
+const Login = () => {
+    const navigation = useNavigation()
+    const dispatch = useDispatch()
     const { colors, dark } = useTheme()
 
-    const dispatch = useDispatch()
-    const { isLoading, isError, isSuccess, message } = useSelector(
-        (state) => state.customer
+    const { isLoading: authLoading, isLoggedIn } = useSelector(
+        (state) => state.auth
     )
 
-    const inputChangedHandler = useCallback(
-        (inputId, inputValue) => {
-            const result = validateInput(inputId, inputValue)
-            dispatchFormState({ inputId, validationResult: result, inputValue })
-        },
-        [dispatchFormState]
-    )
+    const [loading, setLoading] = useState(false)
+    const [rememberMe, setRememberMe] = useState(false)
+    const [step, setStep] = useState(1)
+    const [tempToken, setTempToken] = useState(null)
+    const [userIdentifier, setUserIdentifier] = useState('')
+    const [countdown, setCountdown] = useState(0)
+    const [otpCode, setOtpCode] = useState('') // Simplified state
+    const [deviceToken, setDeviceToken] = useState(null)
+
+    const {
+        control,
+        handleSubmit,
+        setValue,
+        formState: { errors },
+    } = useForm({
+        defaultValues: { emailOrMobile: '' },
+    })
 
     useEffect(() => {
-        // This effect runs after a successful or failed login attempt
-        if (isSuccess && !isLoading) {
-            // Reset navigation stack to prevent going back to login screen
-            navigation.dispatch(
-                CommonActions.reset({
-                    index: 0,
-                    routes: [{ name: 'MainStack' }],
-                })
-            )
-            dispatch(resetCustomerState())
+        const prepare = async () => {
+            await loadRememberedCredentials()
+            try {
+                const token = await FCMService.getToken()
+                setDeviceToken(token)
+            } catch (err) {
+                console.log('FCM token error:', err)
+            }
         }
+        prepare()
+    }, [])
 
-        if (isError) {
-            Alert.alert('Login Failed', message)
-            dispatch(resetCustomerState())
+    useEffect(() => {
+        if (countdown > 0) {
+            const timer = setTimeout(() => setCountdown(countdown - 1), 1000)
+            return () => clearTimeout(timer)
         }
-    }, [isSuccess, isError, isLoading, message, navigation, dispatch])
+    }, [countdown])
 
-    const loginHandler = async () => {
-        if (!formState.formIsValid) {
-            Alert.alert(
-                'Invalid Input',
-                'Please check your email and password.',
-                [{ text: 'Okay' }]
-            )
+    useEffect(() => {
+        if (isLoggedIn) {
+            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] })
+        }
+        return () => {
+            dispatch(clearError())
+        }
+    }, [isLoggedIn])
+
+    const loadRememberedCredentials = async () => {
+        try {
+            const remembered = await AsyncStorage.getItem('rememberedUser')
+            if (remembered) {
+                const { emailOrMobile } = JSON.parse(remembered)
+                setValue('emailOrMobile', emailOrMobile)
+                setRememberMe(true)
+            }
+        } catch (e) {
+            console.log('RememberMe load error', e)
+        }
+    }
+
+    const handleSendOTP = async (data) => {
+        setLoading(true)
+        try {
+            const id = data.emailOrMobile.trim()
+            const result = await dispatch(
+                signinSendOTP({ emailOrMobile: id })
+            ).unwrap()
+
+            if (result.success) {
+                setTempToken(result.tempToken)
+                setUserIdentifier(id)
+                setCountdown(120)
+                setStep(2)
+
+                if (rememberMe) {
+                    await AsyncStorage.setItem(
+                        'rememberedUser',
+                        JSON.stringify({ emailOrMobile: id })
+                    )
+                } else {
+                    await AsyncStorage.removeItem('rememberedUser')
+                }
+            }
+        } catch (error) {
+            Alert.alert('Login Failed', error || 'User not found')
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleVerifyOTP = async () => {
+        if (otpCode.length !== 6) {
+            Alert.alert('Required', 'Please enter the 6-digit OTP')
             return
         }
 
-        const { email, password } = formState.inputValues
-
-        // Dispatch the loginCustomer thunk
-        // The Redux slice will handle API calls, token saving, and state updates
-        dispatch(loginCustomer({ email, password }))
+        setLoading(true)
+        try {
+            await dispatch(
+                signinVerifyOTP({
+                    otp: otpCode,
+                    tempToken,
+                    deviceToken,
+                    platform: Platform.OS,
+                })
+            ).unwrap()
+        } catch (error) {
+            setOtpCode('') // Clear on error
+        } finally {
+            setLoading(false)
+        }
     }
 
-    // implementing apple authentication
-    const appleAuthHandler = () => {
-        console.log('Apple Authentication')
-    }
+    /* ---------------- RENDERING ---------------- */
 
-    // implementing facebook authentication
-    const facebookAuthHandler = () => {
-        console.log('Facebook Authentication')
-    }
+    const renderStep1 = () => (
+        <>
+            <Header title="Sign In" onPress={() => navigation.goBack()} />
 
-    // Implementing google authentication
-    const googleAuthHandler = () => {
-        console.log('Google Authentication')
-    }
+            <View style={styles.logoContainer}>
+                <Image source={images.logo} style={styles.logo} />
+                <Text style={[styles.title, { color: colors.text }]}>
+                    Welcome Back
+                </Text>
+                <Text style={[styles.subtitle, { color: colors.grayscale700 }]}>
+                    Sign in to your RK Electronics account
+                </Text>
+            </View>
+
+            <View style={styles.formContainer}>
+                <Controller
+                    control={control}
+                    name="emailOrMobile"
+                    rules={{
+                        required: 'Email or Mobile is required',
+                        pattern: {
+                            value: /^([^\s@]+@[^\s@]+\.[^\s@]+|[6-9]\d{9})$/,
+                            message: 'Enter a valid email or 10-digit mobile',
+                        },
+                    }}
+                    render={({ field: { onChange, value } }) => (
+                        <Input
+                            placeholder="Email or Mobile Number"
+                            icon={icons.user}
+                            value={value}
+                            onInputChanged={(_, v) => onChange(v)}
+                            errorText={errors.emailOrMobile?.message}
+                            autoCapitalize="none"
+                        />
+                    )}
+                />
+
+                <View style={styles.optionsContainer}>
+                    <TouchableOpacity
+                        style={styles.checkboxRow}
+                        onPress={() => setRememberMe(!rememberMe)}
+                        activeOpacity={0.7}
+                    >
+                        <Checkbox
+                            value={rememberMe}
+                            onValueChange={setRememberMe}
+                            color={rememberMe ? COLORS.primary : undefined}
+                            style={styles.checkbox}
+                        />
+                        <Text
+                            style={[styles.optionLabel, { color: colors.text }]}
+                        >
+                            Remember Me
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('ForgotPassword')}
+                    >
+                        <Text style={styles.linkText}>Forgot Password?</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <Button
+                    title={
+                        loading || authLoading ? 'Sending OTP...' : 'Continue'
+                    }
+                    onPress={handleSubmit(handleSendOTP)}
+                    filled
+                    disabled={loading || authLoading}
+                    style={styles.mainBtn}
+                />
+            </View>
+
+            <View style={styles.footer}>
+                <Text style={{ color: colors.text, fontSize: 15 }}>
+                    Don't have an account?{' '}
+                </Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
+                    <Text style={[styles.linkText, { fontSize: 15 }]}>
+                        Sign Up
+                    </Text>
+                </TouchableOpacity>
+            </View>
+        </>
+    )
+
+    const renderStep2 = () => (
+        <>
+            <Header title="Verify Identity" onPress={() => setStep(1)} />
+
+            <View style={styles.logoContainer}>
+                <Image source={images.logo} style={styles.logo} />
+                <Text style={[styles.title, { color: colors.text }]}>
+                    Verification Code
+                </Text>
+                <Text style={[styles.subtitle, { color: colors.grayscale700 }]}>
+                    Sent to{' '}
+                    <Text style={{ fontWeight: 'bold', color: colors.text }}>
+                        {userIdentifier}
+                    </Text>
+                </Text>
+            </View>
+
+            <View style={styles.otpSection}>
+                <OtpInput
+                    numberOfDigits={6}
+                    focusColor={COLORS.primary}
+                    focusStickBlinkingDuration={500}
+                    onTextChange={(text) => setOtpCode(text)}
+                    theme={{
+                        pinCodeContainerStyle: {
+                            backgroundColor: dark
+                                ? COLORS.dark2
+                                : COLORS.secondaryWhite,
+                            borderColor: dark
+                                ? COLORS.gray
+                                : COLORS.grayscale200,
+                            borderRadius: 12,
+                            width: 48,
+                            height: 55,
+                        },
+                        pinCodeTextStyle: {
+                            color: colors.text,
+                            fontSize: 22,
+                            fontWeight: '700',
+                        },
+                    }}
+                />
+            </View>
+
+            <View style={styles.resendWrapper}>
+                {countdown > 0 ? (
+                    <Text
+                        style={{
+                            color: colors.text,
+                            opacity: 0.7,
+                            fontSize: 15,
+                        }}
+                    >
+                        Resend code in{' '}
+                        <Text
+                            style={{ color: COLORS.primary, fontWeight: '700' }}
+                        >
+                            {countdown}s
+                        </Text>
+                    </Text>
+                ) : (
+                    <TouchableOpacity
+                        onPress={() =>
+                            handleSendOTP({ emailOrMobile: userIdentifier })
+                        }
+                    >
+                        <Text style={styles.linkText}>Resend OTP</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            <Button
+                title={loading ? 'Verifying...' : 'Verify & Login'}
+                onPress={handleVerifyOTP}
+                filled
+                disabled={loading || otpCode.length < 6}
+                style={styles.mainBtn}
+            />
+        </>
+    )
 
     return (
         <SafeAreaView
-            style={[
-                styles.area,
-                {
-                    backgroundColor: colors.background,
-                },
-            ]}
+            style={[styles.area, { backgroundColor: colors.background }]}
         >
-            <View
-                style={[
-                    styles.container,
-                    {
-                        backgroundColor: colors.background,
-                    },
-                ]}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
             >
-                <Header />
-                <ScrollView showsVerticalScrollIndicator={false}>
-                    <View style={styles.logoContainer}>
-                        <Image
-                            source={images.logo}
-                            resizeMode="contain"
-                            style={styles.logo}
-                        />
-                    </View>
-                    <Text
-                        style={[
-                            styles.title,
-                            {
-                                color: dark ? COLORS.white : COLORS.black,
-                            },
-                        ]}
-                    >
-                        Login to Your Account
-                    </Text>
-                    <Input
-                        id="email"
-                        onInputChanged={inputChangedHandler}
-                        errorText={formState.inputValidities['email']}
-                        placeholder="Email"
-                        placeholderTextColor={
-                            dark ? COLORS.grayTie : COLORS.black
-                        }
-                        icon={icons.email}
-                        keyboardType="email-address"
-                        initialValue={formState.inputValues.email}
-                    />
-                    <Input
-                        onInputChanged={inputChangedHandler}
-                        errorText={formState.inputValidities['password']}
-                        autoCapitalize="none"
-                        id="password"
-                        placeholder="Password"
-                        placeholderTextColor={
-                            dark ? COLORS.grayTie : COLORS.black
-                        }
-                        icon={icons.padlock}
-                        secureTextEntry={true}
-                        initialValue={formState.inputValues.password}
-                    />
-                    <View style={styles.checkBoxContainer}>
-                        <View style={{ flexDirection: 'row' }}>
-                            <Checkbox
-                                style={styles.checkbox}
-                                value={isChecked}
-                                color={
-                                    isChecked
-                                        ? COLORS.primary
-                                        : dark
-                                          ? COLORS.primary
-                                          : 'gray'
-                                }
-                                onValueChange={setChecked}
-                            />
-                            <View style={{ flex: 1 }}>
-                                <Text
-                                    style={[
-                                        styles.privacy,
-                                        {
-                                            color: dark
-                                                ? COLORS.white
-                                                : COLORS.black,
-                                        },
-                                    ]}
-                                >
-                                    Remember me
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-
-                    {isLoading ? (
-                        <ActivityIndicator
-                            size="large"
-                            color={COLORS.primary}
-                            style={styles.button}
-                        />
-                    ) : (
-                        <Button
-                            title="Login"
-                            filled
-                            onPress={loginHandler}
-                            style={styles.button}
-                            disabled={!formState.formIsValid}
-                        />
-                    )}
-
-                    <TouchableOpacity
-                        onPress={() =>
-                            navigation.navigate('ForgotPasswordMethods')
-                        }
-                    >
-                        <Text style={styles.forgotPasswordBtnText}>
-                            Forgot the password?
-                        </Text>
-                    </TouchableOpacity>
-                    <View style={styles.bottomContainer}>
-                        <Text
-                            style={[
-                                styles.bottomLeft,
-                                {
-                                    color: dark ? COLORS.white : COLORS.black,
-                                },
-                            ]}
-                        >
-                            Don't have an account ?
-                        </Text>
-                        <TouchableOpacity
-                            onPress={() => navigation.navigate('Signup')}
-                        >
-                            <Text style={styles.bottomRight}>
-                                {'  '}Sign Up
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.scrollContainer}
+                >
+                    {step === 1 ? renderStep1() : renderStep2()}
                 </ScrollView>
-            </View>
+            </KeyboardAvoidingView>
         </SafeAreaView>
     )
 }
 
 const styles = StyleSheet.create({
-    area: {
-        flex: 1,
-        backgroundColor: COLORS.white,
-    },
-    container: {
-        flex: 1,
-        padding: 16,
-        backgroundColor: COLORS.white,
-    },
-    logo: {
-        width: 100,
-        height: 100,
-        // tintColor: COLORS.primary
-    },
-    logoContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginVertical: 32,
-    },
-    title: {
-        fontSize: 28,
-        fontFamily: 'bold',
-        color: COLORS.black,
-        textAlign: 'center',
-    },
-    center: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    title: {
-        fontSize: 26,
-        fontFamily: 'semiBold',
-        color: COLORS.black,
-        textAlign: 'center',
-        marginBottom: 22,
-    },
-    checkBoxContainer: {
+    area: { flex: 1 },
+    scrollContainer: { paddingHorizontal: 24, paddingBottom: 40 },
+    logoContainer: { alignItems: 'center', marginTop: 40, marginBottom: 30 },
+    logo: { width: 120, height: 120, resizeMode: 'contain', marginBottom: 20 },
+    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
+    subtitle: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
+    formContainer: { width: '100%' },
+    optionsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginVertical: 18,
+        marginVertical: 20,
     },
-    checkbox: {
-        marginRight: 8,
-        height: 16,
-        width: 16,
-        borderRadius: 4,
-        borderColor: COLORS.primary,
-        borderWidth: 2,
-    },
-    privacy: {
-        fontSize: 12,
-        fontFamily: 'regular',
-        color: COLORS.black,
-    },
-    socialTitle: {
-        fontSize: 19.25,
-        fontFamily: 'medium',
-        color: COLORS.black,
-        textAlign: 'center',
-        marginVertical: 26,
-    },
-    socialBtnContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    bottomContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginVertical: 18,
-        // position: 'absolute',
-        // bottom: 12,
-        right: 0,
-        left: 0,
-    },
-    bottomLeft: {
-        fontSize: 14,
-        fontFamily: 'regular',
-        color: 'black',
-    },
-    bottomRight: {
-        fontSize: 16,
-        fontFamily: 'medium',
-        color: COLORS.primary,
-    },
-    button: {
-        marginVertical: 6,
-        width: SIZES.width - 32,
-        borderRadius: 30,
-    },
-    forgotPasswordBtnText: {
-        fontSize: 16,
-        fontFamily: 'semiBold',
-        color: COLORS.primary,
-        textAlign: 'center',
-        marginTop: 12,
-    },
+    checkboxRow: { flexDirection: 'row', alignItems: 'center' },
+    checkbox: { width: 20, height: 20, borderRadius: 6 },
+    optionLabel: { marginLeft: 10, fontSize: 14, fontWeight: '500' },
+    linkText: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
+    mainBtn: { marginTop: 10, borderRadius: 32, height: 56 },
+    footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 40 },
+    // OTP UX
+    otpSection: { marginVertical: 30, width: '100%' },
+    resendWrapper: { alignItems: 'center', marginBottom: 30 },
 })
 
 export default Login

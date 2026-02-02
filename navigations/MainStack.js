@@ -43,11 +43,13 @@ import {
     CancelBookingPaymentMethods,
     MyBookings,
     ReviewSummary,
+    Profile,
 } from '../screens'
 
 import SupportTicketDetail from '../screens/SupportTicketDetail'
 import PlansScreen from '../screens/Plans'
 import ConnectionsScreen from '../screens/Connections'
+import Menu from '../screens/Menu'
 
 const Stack = createNativeStackNavigator()
 
@@ -67,6 +69,8 @@ const MainStack = () => {
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="MainTabs" component={BottomTabNavigation} />
                 <Stack.Screen name="EditProfile" component={EditProfile} />
+                <Stack.Screen name="Profile" component={Profile} />
+                <Stack.Screen name="Menu" component={Menu} />
                 <Stack.Screen
                     name="SettingsNotifications"
                     component={SettingsNotifications}

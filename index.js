@@ -45,6 +45,11 @@ createNotificationChannels()
 const app = getApp()
 const messaging = getMessaging(app)
 
+// console.log(
+//   '🔥 Firebase App Options:',
+//   getApp().options
+// )
+
 setBackgroundMessageHandler(messaging, async (remoteMessage) => {
     console.log('📩 Background Message received:', remoteMessage)
 

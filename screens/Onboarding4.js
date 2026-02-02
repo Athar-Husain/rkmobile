@@ -6,9 +6,10 @@ import DotsView from '../components/DotsView'
 import Button from '../components/Button'
 import Onboarding1Styles from '../styles/OnboardingStyles'
 import { useDispatch } from 'react-redux' // Import useDispatch hook
-import { markOnboardingComplete } from '../redux/features/Customers/CustomerSlice' // Import completeOnboarding action
+// import { markOnboardingComplete } from '../redux/features/Customers/CustomerSlice' // Import completeOnboarding action
 import { COLORS, images } from '../constants'
 import { useTheme } from '../theme/ThemeProvider'
+import { markOnboardingComplete } from '../redux/features/Auth/AuthSlice'
 
 const Onboarding4 = ({ navigation }) => {
     const { colors } = useTheme()

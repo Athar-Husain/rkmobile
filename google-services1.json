@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "851807087498",
+    "project_id": "rkelectronics-e51b9",
+    "storage_bucket": "rkelectronics-e51b9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:851807087498:android:662060c61ea254d06c7673",
+        "android_client_info": {
+          "package_name": "com.rkelectronics.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZIG_JuC9tdkBbslHKxpnDY-hsMYJx-LU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -11,13 +11,12 @@ import { COLORS, SIZES, icons, images } from '../constants'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ScrollView } from 'react-native-virtualized-view'
 import { MaterialIcons } from '@expo/vector-icons'
-import { launchImagePicker } from '../utils/ImagePickerHelper'
 import SettingsItem from '../components/SettingsItem'
 import { useTheme } from '../theme/ThemeProvider'
 import RBSheet from 'react-native-raw-bottom-sheet'
 import Button from '../components/Button'
 import { useDispatch } from 'react-redux'
-import { logoutCustomer } from '../redux/features/Customers/CustomerSlice'
+import { logout } from '../redux/features/Auth/AuthSlice'
 
 const Menu = ({ navigation }) => {
     const dispatch = useDispatch()
@@ -26,361 +25,169 @@ const Menu = ({ navigation }) => {
 
     const handleLogout = async () => {
         try {
-            await dispatch(logoutCustomer()).unwrap()
-            // refRBSheet.current.close()
-
-            // Optional: Navigate to login screen if using React Navigation
-            // navigation.replace('Login')
+            await dispatch(logout()).unwrap()
+            refRBSheet.current.close()
         } catch (error) {
             console.error('Logout failed', error)
         }
     }
-    /**
-     * Render Header
-     */
-    const renderHeader = () => {
-        return (
-            <TouchableOpacity style={styles.headerContainer}>
-                <View style={styles.headerLeft}>
-                    <Image
-                        source={images.logo}
-                        resizeMode="contain"
-                        style={styles.logo}
-                    />
-                    <Text
-                        style={[
-                            styles.headerTitle,
-                            {
-                                color: dark
-                                    ? COLORS.white
-                                    : COLORS.greyscale900,
-                            },
-                        ]}
-                    >
-                        Profile
-                    </Text>
-                </View>
-                <TouchableOpacity>
-                    <Image
-                        source={icons.moreCircle}
-                        resizeMode="contain"
-                        style={[
-                            styles.headerIcon,
-                            {
-                                tintColor: dark
-                                    ? COLORS.secondaryWhite
-                                    : COLORS.greyscale900,
-                            },
-                        ]}
-                    />
-                </TouchableOpacity>
-            </TouchableOpacity>
-        )
-    }
-    /**
-     * Render User Profile
-     */
-    const renderProfile = () => {
-        const [image, setImage] = useState(images.user1)
 
-        const pickImage = async () => {
-            try {
-                const tempUri = await launchImagePicker()
-
-                if (!tempUri) return
-
-                // set the image
-                setImage({ uri: tempUri })
-            } catch (error) {}
-        }
-        return (
-            <View style={styles.profileContainer}>
-                <View>
-                    <Image
-                        source={image}
-                        resizeMode="cover"
-                        style={styles.avatar}
-                    />
-                    <TouchableOpacity
-                        onPress={pickImage}
-                        style={styles.picContainer}
-                    >
-                        <MaterialIcons
-                            name="edit"
-                            size={16}
-                            color={COLORS.white}
-                        />
-                    </TouchableOpacity>
-                </View>
+    const renderHeader = () => (
+        <View style={styles.headerContainer}>
+            <View style={styles.headerLeft}>
+                <Image
+                    source={images.logo}
+                    resizeMode="contain"
+                    style={styles.logo}
+                />
                 <Text
                     style={[
-                        styles.title,
-                        {
-                            color: dark
-                                ? COLORS.secondaryWhite
-                                : COLORS.greyscale900,
-                        },
+                        styles.headerTitle,
+                        { color: dark ? COLORS.white : COLORS.greyscale900 },
                     ]}
                 >
-                    Nathalie Erneson hgh
-                </Text>
-                <Text
-                    style={[
-                        styles.subtitle,
-                        {
-                            color: dark
-                                ? COLORS.secondaryWhite
-                                : COLORS.greyscale900,
-                        },
-                    ]}
-                >
-                    nathalie_erneson@gmail.com
+                    Settings
                 </Text>
             </View>
-        )
-    }
-    /**
-     * Render Settings
-     */
-    const renderSettings = () => {
-        const [isDarkMode, setIsDarkMode] = useState(false)
+        </View>
+    )
 
-        const toggleDarkMode = () => {
-            setIsDarkMode((prev) => !prev)
-            dark ? setScheme('light') : setScheme('dark')
-        }
-
-        return (
-            <View style={styles.settingsContainer}>
-                {/* <SettingsItem
-                    icon={icons.calendar}
-                    name="My Booking"
-                    onPress={() => navigation.navigate('MyBookings')}
-                /> */}
-                <SettingsItem
-                    icon={icons.userOutline}
-                    name="Edit Profile"
-                    onPress={() => navigation.navigate('EditProfile')}
-                />
-                <SettingsItem
-                    icon={icons.bell2}
-                    name="Notification"
-                    onPress={() => navigation.navigate('SettingsNotifications')}
-                />
-                <SettingsItem
-                    icon={icons.wifi}
-                    name="Connections"
-                    onPress={() => navigation.navigate('Connections')}
-                />
-                {/* <SettingsItem
-                    icon={icons.wallet2Outline}
-                    name="Payment"
-                    onPress={() => navigation.navigate('SettingsPayment')}
-                /> */}
-                <SettingsItem
-                    icon={icons.shieldOutline}
-                    name="Security"
-                    onPress={() => navigation.navigate('SettingsSecurity')}
-                />
-                {/* <TouchableOpacity
-                    onPress={() => navigation.navigate('SettingsLanguage')}
-                    style={styles.settingsItemContainer}
-                >
-                    <View style={styles.leftContainer}>
-                        <Image
-                            source={icons.more}
-                            resizeMode="contain"
-                            style={[
-                                styles.settingsIcon,
-                                {
-                                    tintColor: dark
-                                        ? COLORS.white
-                                        : COLORS.greyscale900,
-                                },
-                            ]}
-                        />
-                        <Text
-                            style={[
-                                styles.settingsName,
-                                {
-                                    color: dark
-                                        ? COLORS.white
-                                        : COLORS.greyscale900,
-                                },
-                            ]}
-                        >
-                            Language & Region
-                        </Text>
-                    </View>
-                    <View style={styles.rightContainer}>
-                        <Text
-                            style={[
-                                styles.rightLanguage,
-                                {
-                                    color: dark
-                                        ? COLORS.white
-                                        : COLORS.greyscale900,
-                                },
-                            ]}
-                        >
-                            English (US)
-                        </Text>
-                        <Image
-                            source={icons.arrowRight}
-                            resizeMode="contain"
-                            style={[
-                                styles.settingsArrowRight,
-                                {
-                                    tintColor: dark
-                                        ? COLORS.white
-                                        : COLORS.greyscale900,
-                                },
-                            ]}
-                        />
-                    </View>
-                </TouchableOpacity> */}
-                <TouchableOpacity style={styles.settingsItemContainer}>
-                    <View style={styles.leftContainer}>
-                        <Image
-                            source={icons.show}
-                            resizeMode="contain"
-                            style={[
-                                styles.settingsIcon,
-                                {
-                                    tintColor: dark
-                                        ? COLORS.white
-                                        : COLORS.greyscale900,
-                                },
-                            ]}
-                        />
-                        <Text
-                            style={[
-                                styles.settingsName,
-                                {
-                                    color: dark
-                                        ? COLORS.white
-                                        : COLORS.greyscale900,
-                                },
-                            ]}
-                        >
-                            Dark Mode
-                        </Text>
-                    </View>
-                    <View style={styles.rightContainer}>
-                        <Switch
-                            value={isDarkMode}
-                            onValueChange={toggleDarkMode}
-                            thumbColor={isDarkMode ? '#fff' : COLORS.white}
-                            trackColor={{
-                                false: '#EEEEEE',
-                                true: COLORS.primary,
-                            }}
-                            ios_backgroundColor={COLORS.white}
-                            style={styles.switch}
-                        />
-                    </View>
-                </TouchableOpacity>
-                <SettingsItem
-                    icon={icons.lockedComputerOutline}
-                    name="Privacy Policy"
-                    onPress={() => navigation.navigate('SettingsPrivacyPolicy')}
-                />
-                {/* <SettingsItem
-                    icon={icons.infoCircle}
-                    name="Help Center"
-                    onPress={() => navigation.navigate('HelpCenter')}
-                /> */}
-                {/* <SettingsItem
-                    icon={icons.people4}
-                    name="Invite Friends"
-                    onPress={() => navigation.navigate('InviteFriends')}
-                /> */}
-                <TouchableOpacity
-                    onPress={() => refRBSheet.current.open()}
-                    style={styles.logoutContainer}
-                >
-                    <View style={styles.logoutLeftContainer}>
-                        <Image
-                            source={icons.logout}
-                            resizeMode="contain"
-                            style={[
-                                styles.logoutIcon,
-                                {
-                                    tintColor: 'red',
-                                },
-                            ]}
-                        />
-                        <Text
-                            style={[
-                                styles.logoutName,
-                                {
-                                    color: 'red',
-                                },
-                            ]}
-                        >
-                            Logout
-                        </Text>
-                    </View>
-                </TouchableOpacity>
-            </View>
-        )
-    }
     return (
         <SafeAreaView
             style={[styles.area, { backgroundColor: colors.background }]}
         >
-            <View
-                style={[
-                    styles.container,
-                    { backgroundColor: colors.background },
-                ]}
-            >
+            <View style={styles.container}>
                 {renderHeader()}
                 <ScrollView showsVerticalScrollIndicator={false}>
-                    {renderProfile()}
-                    {renderSettings()}
+                    {/* Compact Profile Summary */}
+                    <TouchableOpacity
+                        style={styles.miniProfile}
+                        onPress={() => navigation.navigate('Profile')}
+                    >
+                        <Image
+                            source={images.user1}
+                            style={styles.miniAvatar}
+                        />
+                        <View style={{ flex: 1, marginLeft: 12 }}>
+                            <Text
+                                style={[
+                                    styles.nameText,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale900,
+                                    },
+                                ]}
+                            >
+                                Nathalie Erneson
+                            </Text>
+                            <Text style={styles.viewProfileText}>
+                                Account Details & Activity
+                            </Text>
+                        </View>
+                        <MaterialIcons
+                            name="chevron-right"
+                            size={24}
+                            color={COLORS.greyscale500}
+                        />
+                    </TouchableOpacity>
+
+                    <View style={styles.sectionDivider} />
+
+                    <Text style={styles.sectionLabel}>Preferences</Text>
+                    <SettingsItem
+                        icon={icons.bell2}
+                        name="Notification"
+                        onPress={() =>
+                            navigation.navigate('SettingsNotifications')
+                        }
+                    />
+
+                    {/* Dark Mode Toggle Row */}
+                    <View style={styles.customRow}>
+                        <View style={styles.leftRow}>
+                            <Image
+                                source={icons.show}
+                                style={[
+                                    styles.rowIcon,
+                                    {
+                                        tintColor: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale900,
+                                    },
+                                ]}
+                            />
+                            <Text
+                                style={[
+                                    styles.rowLabel,
+                                    {
+                                        color: dark
+                                            ? COLORS.white
+                                            : COLORS.greyscale900,
+                                    },
+                                ]}
+                            >
+                                Dark Mode
+                            </Text>
+                        </View>
+                        <Switch
+                            value={dark}
+                            onValueChange={() =>
+                                setScheme(dark ? 'light' : 'dark')
+                            }
+                            trackColor={{
+                                false: '#EEEEEE',
+                                true: COLORS.primary,
+                            }}
+                        />
+                    </View>
+
+                    <Text style={styles.sectionLabel}>Security & Legal</Text>
+                    <SettingsItem
+                        icon={icons.shieldOutline}
+                        name="Security"
+                        onPress={() => navigation.navigate('SettingsSecurity')}
+                    />
+                    <SettingsItem
+                        icon={icons.lockedComputerOutline}
+                        name="Privacy Policy"
+                        onPress={() =>
+                            navigation.navigate('SettingsPrivacyPolicy')
+                        }
+                    />
+
+                    <TouchableOpacity
+                        onPress={() => refRBSheet.current.open()}
+                        style={styles.simpleLogout}
+                    >
+                        <MaterialIcons
+                            name="logout"
+                            size={22}
+                            color={COLORS.red}
+                        />
+                        <Text style={styles.simpleLogoutText}>Logout</Text>
+                    </TouchableOpacity>
                 </ScrollView>
             </View>
+
             <RBSheet
                 ref={refRBSheet}
                 closeOnDragDown={true}
-                closeOnPressMask={false}
-                height={SIZES.height * 0.8}
+                height={260}
                 customStyles={{
-                    wrapper: {
-                        backgroundColor: 'rgba(0,0,0,0.5)',
-                    },
-                    draggableIcon: {
-                        backgroundColor: dark
-                            ? COLORS.gray2
-                            : COLORS.grayscale200,
-                        height: 4,
-                    },
                     container: {
                         borderTopRightRadius: 32,
                         borderTopLeftRadius: 32,
-                        height: 260,
                         backgroundColor: dark ? COLORS.dark2 : COLORS.white,
                     },
                 }}
             >
                 <Text style={styles.bottomTitle}>Logout</Text>
-                <View
-                    style={[
-                        styles.separateLine,
-                        {
-                            backgroundColor: dark
-                                ? COLORS.greyScale800
-                                : COLORS.grayscale200,
-                        },
-                    ]}
-                />
+                <View style={styles.separateLine} />
                 <Text
                     style={[
                         styles.bottomSubtitle,
-                        {
-                            color: dark ? COLORS.white : COLORS.black,
-                        },
+                        { color: dark ? COLORS.white : COLORS.black },
                     ]}
                 >
                     Are you sure you want to log out?
@@ -388,29 +195,14 @@ const Menu = ({ navigation }) => {
                 <View style={styles.bottomContainer}>
                     <Button
                         title="Cancel"
-                        style={{
-                            width: (SIZES.width - 32) / 2 - 8,
-                            backgroundColor: dark
-                                ? COLORS.dark3
-                                : COLORS.tansparentPrimary,
-                            borderRadius: 32,
-                            borderColor: dark
-                                ? COLORS.dark3
-                                : COLORS.tansparentPrimary,
-                        }}
+                        style={styles.cancelBtn}
                         textColor={dark ? COLORS.white : COLORS.primary}
                         onPress={() => refRBSheet.current.close()}
                     />
-                    {/* <Button
-                        title="Yes, Logout"
-                        filled
-                        style={styles.logoutButton}
-                        onPress={() => refRBSheet.current.close()}
-                    /> */}
                     <Button
                         title="Yes, Logout"
                         filled
-                        style={styles.logoutButton}
+                        style={styles.logoutBtnAction}
                         onPress={handleLogout}
                     />
                 </View>
@@ -420,177 +212,84 @@ const Menu = ({ navigation }) => {
 }
 
 const styles = StyleSheet.create({
-    area: {
-        flex: 1,
-        backgroundColor: COLORS.white,
-    },
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.white,
-        padding: 16,
-        marginBottom: 32,
-    },
+    area: { flex: 1 },
+    container: { flex: 1, paddingHorizontal: 16 },
     headerContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    headerLeft: {
+        paddingVertical: 15,
         flexDirection: 'row',
         alignItems: 'center',
     },
-    logo: {
-        height: 32,
-        width: 32,
-        tintColor: COLORS.primary,
-    },
-    headerTitle: {
-        fontSize: 22,
-        fontFamily: 'bold',
-        color: COLORS.greyscale900,
-        marginLeft: 12,
-    },
-    headerIcon: {
-        height: 24,
-        width: 24,
-        tintColor: COLORS.greyscale900,
-    },
-    profileContainer: {
+    logo: { height: 28, width: 28, tintColor: COLORS.primary },
+    headerTitle: { fontSize: 22, fontFamily: 'bold', marginLeft: 12 },
+    miniProfile: {
+        flexDirection: 'row',
         alignItems: 'center',
-        borderBottomColor: COLORS.grayscale400,
-        borderBottomWidth: 0.4,
         paddingVertical: 20,
     },
-    avatar: {
-        width: 120,
-        height: 120,
-        borderRadius: 999,
-    },
-    picContainer: {
-        width: 20,
-        height: 20,
-        borderRadius: 4,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: COLORS.primary,
-        position: 'absolute',
-        right: 0,
-        bottom: 12,
-    },
-    title: {
-        fontSize: 18,
-        fontFamily: 'bold',
-        color: COLORS.greyscale900,
-        marginTop: 12,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: COLORS.greyscale900,
-        fontFamily: 'medium',
-        marginTop: 4,
-    },
-    settingsContainer: {
-        marginVertical: 12,
-    },
-    settingsItemContainer: {
-        width: SIZES.width - 32,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginVertical: 12,
-    },
-    leftContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    settingsIcon: {
-        height: 24,
-        width: 24,
-        tintColor: COLORS.greyscale900,
-    },
-    settingsName: {
-        fontSize: 18,
-        fontFamily: 'semiBold',
-        color: COLORS.greyscale900,
-        marginLeft: 12,
-    },
-    settingsArrowRight: {
-        width: 24,
-        height: 24,
-        tintColor: COLORS.greyscale900,
-    },
-    rightContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    rightLanguage: {
-        fontSize: 18,
-        fontFamily: 'semiBold',
-        color: COLORS.greyscale900,
-        marginRight: 8,
-    },
-    switch: {
-        marginLeft: 8,
-        transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }], // Adjust the size of the switch
-    },
-    logoutContainer: {
-        width: SIZES.width - 32,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginVertical: 12,
-    },
-    logoutLeftContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    logoutIcon: {
-        height: 24,
-        width: 24,
-        tintColor: COLORS.greyscale900,
-    },
-    logoutName: {
-        fontSize: 18,
-        fontFamily: 'semiBold',
-        color: COLORS.greyscale900,
-        marginLeft: 12,
-    },
-    bottomContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginVertical: 12,
-        paddingHorizontal: 16,
-    },
-    cancelButton: {
-        width: (SIZES.width - 32) / 2 - 8,
-        backgroundColor: COLORS.tansparentPrimary,
-        borderRadius: 32,
-    },
-    logoutButton: {
-        width: (SIZES.width - 32) / 2 - 8,
-        backgroundColor: COLORS.primary,
-        borderRadius: 32,
-    },
-    bottomTitle: {
-        fontSize: 24,
-        fontFamily: 'semiBold',
-        color: 'red',
-        textAlign: 'center',
-        marginTop: 12,
-    },
-    bottomSubtitle: {
-        fontSize: 20,
-        fontFamily: 'semiBold',
-        color: COLORS.greyscale900,
-        textAlign: 'center',
-        marginVertical: 28,
-    },
-    separateLine: {
-        width: SIZES.width,
+    miniAvatar: { width: 50, height: 50, borderRadius: 25 },
+    nameText: { fontSize: 18, fontFamily: 'bold' },
+    viewProfileText: { fontSize: 13, color: COLORS.greyscale600, marginTop: 2 },
+    sectionDivider: {
         height: 1,
         backgroundColor: COLORS.grayscale200,
+        marginVertical: 10,
+    },
+    sectionLabel: {
+        fontSize: 12,
+        fontFamily: 'bold',
+        color: COLORS.greyscale500,
+        textTransform: 'uppercase',
+        marginVertical: 15,
+        letterSpacing: 1,
+    },
+    customRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 12,
+    },
+    leftRow: { flexDirection: 'row', alignItems: 'center' },
+    rowIcon: { width: 24, height: 24 },
+    rowLabel: { fontSize: 18, fontFamily: 'semiBold', marginLeft: 12 },
+    simpleLogout: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 30,
+        paddingVertical: 10,
+    },
+    simpleLogoutText: {
+        color: COLORS.red,
+        fontSize: 18,
+        fontFamily: 'semiBold',
+        marginLeft: 12,
+    },
+    bottomTitle: {
+        fontSize: 22,
+        fontFamily: 'bold',
+        color: COLORS.red,
+        textAlign: 'center',
         marginTop: 12,
+    },
+    bottomSubtitle: { fontSize: 16, textAlign: 'center', marginVertical: 20 },
+    bottomContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        paddingHorizontal: 16,
+    },
+    cancelBtn: {
+        width: '45%',
+        borderRadius: 32,
+        backgroundColor: COLORS.grayscale200,
+    },
+    logoutBtnAction: {
+        width: '45%',
+        borderRadius: 32,
+        backgroundColor: COLORS.primary,
+    },
+    separateLine: {
+        height: 1,
+        backgroundColor: COLORS.grayscale200,
+        marginTop: 15,
     },
 })
 

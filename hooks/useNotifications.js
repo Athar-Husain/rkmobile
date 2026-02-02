@@ -1,5 +1,4 @@
 // hooks/useNortifications.js
-
 import { useEffect, useRef } from 'react'
 import { getApp } from '@react-native-firebase/app'
 import {
@@ -17,6 +16,8 @@ import notifee, {
 } from '@notifee/react-native'
 import { useDispatch, useSelector } from 'react-redux'
 import { addNotification } from '../redux/features/Notifications/NotificationSlice'
+import AuthService from '../redux/features/Auth/AuthService'
+// import AuthService from '../../services/AuthService'
 
 export const displayLocalNotification = async (remoteMessage) => {
     const data = remoteMessage?.data || {}
@@ -46,8 +47,6 @@ export const displayLocalNotification = async (remoteMessage) => {
                 sound: 'default',
                 vibration: true,
                 pressAction: { id: 'default', launchActivity: 'default' },
-                asForegroundService: false,
-                localOnly: false,
                 category: AndroidCategory.MESSAGE,
                 visibility: AndroidVisibility.PUBLIC,
             },
@@ -75,13 +74,14 @@ export const displayLocalNotification = async (remoteMessage) => {
     }
 }
 
-export const useNotifications = () => {
+export const useNotifications = (isLoggedIn = false) => {
     const dispatch = useDispatch()
-    const { customer, isLoggedIn } = useSelector((state) => state.customer)
+    const { user } = useSelector((state) => state.auth)
     const initialHandled = useRef(false)
+    const tokenRefreshListener = useRef(null)
 
     useEffect(() => {
-        if (!isLoggedIn || !customer?._id) return
+        if (!isLoggedIn || !user?._id) return
 
         const app = getApp()
         const messaging = getMessaging(app)
@@ -111,19 +111,27 @@ export const useNotifications = () => {
             }
         })
 
-        const unsubscribeTokenRefresh = onTokenRefresh(
+        // Handle token refresh and update server
+        tokenRefreshListener.current = onTokenRefresh(
             messaging,
-            (newToken) => {
+            async (newToken) => {
                 console.log('🔄 FCM token refreshed:', newToken)
+                try {
+                    await AuthService.updateFCMToken()
+                } catch (error) {
+                    console.error('Failed to update FCM token:', error)
+                }
             }
         )
 
         return () => {
             unsubscribeForeground()
             unsubscribeNotificationTap()
-            unsubscribeTokenRefresh()
+            if (tokenRefreshListener.current) {
+                tokenRefreshListener.current()
+            }
         }
-    }, [dispatch, customer, isLoggedIn])
+    }, [dispatch, user, isLoggedIn])
 }
 
 export default useNotifications

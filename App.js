@@ -1,53 +1,76 @@
-import React, { useEffect, useState } from 'react'
-import { Provider } from 'react-redux'
-import { SafeAreaProvider } from 'react-native-safe-area-context'
-import { StatusBar } from 'expo-status-bar'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+// App.js
 import * as SplashScreen from 'expo-splash-screen'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { useFonts } from 'expo-font'
+import { useCallback, useEffect } from 'react'
+import { FONTS } from './constants/fonts'
+import { LogBox, View, ActivityIndicator, Text } from 'react-native'
+import { ThemeProvider } from './theme/ThemeProvider'
+import { Provider } from 'react-redux'
+import { store, persistor } from './redux/store'
+import FlashMessage from 'react-native-flash-message'
+import { COLORS } from './constants'
+import AppNavigation from './navigations/AppNavigation'
+import { PersistGate } from 'redux-persist/integration/react'
+import { requestNotificationPermission } from './utils/requestNotificationPermission'
 
-import { store } from './src/store'
-import AppNavigator from './src/navigation/AppNavigator'
-import { setToken } from './src/store/slices/authSlice'
-
-// Keep the splash screen visible while we fetch resources
+// Prevent auto-hide splash screen
 SplashScreen.preventAutoHideAsync()
 
-const App = () => {
-    const [appIsReady, setAppIsReady] = useState(false)
+// Ignore specific warnings
+LogBox.ignoreLogs([
+    'Failed prop type: The prop `message.message`',
+    'Non-serializable values were found in the navigation state',
+])
 
+export default function App() {
+    const [fontsLoaded, fontError] = useFonts(FONTS)
+
+    // ✅ REQUEST NOTIFICATION PERMISSION ON APP START
     useEffect(() => {
-        async function prepare() {
-            try {
-                // Check for stored token
-                const token = await AsyncStorage.getItem('userToken')
-                if (token) {
-                    store.dispatch(setToken(token))
-                }
-
-                // Add any other initialization here
-            } catch (e) {
-                console.warn(e)
-            } finally {
-                setAppIsReady(true)
-                await SplashScreen.hideAsync()
-            }
-        }
-
-        prepare()
+        requestNotificationPermission()
     }, [])
 
-    if (!appIsReady) {
-        return null
+    const onLayoutRootView = useCallback(async () => {
+        if (fontsLoaded || fontError) {
+            await SplashScreen.hideAsync()
+        }
+    }, [fontsLoaded, fontError])
+
+    if (!fontsLoaded && !fontError) {
+        return (
+            <View
+                style={{
+                    flex: 1,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                }}
+            >
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={{ marginTop: 10, color: COLORS.primary }}>
+                    Loading Fonts...
+                </Text>
+            </View>
+        )
     }
 
     return (
         <Provider store={store}>
-            <SafeAreaProvider>
-                <StatusBar style="auto" />
-                <AppNavigator />
-            </SafeAreaProvider>
+            <PersistGate loading={null} persistor={persistor}>
+                <ThemeProvider>
+                    <SafeAreaProvider onLayout={onLayoutRootView}>
+                        <AppNavigation />
+                        <FlashMessage
+                            position="top"
+                            duration={3000}
+                            titleStyle={{ fontSize: 16, fontWeight: '600' }}
+                            textStyle={{ fontSize: 14 }}
+                            floating
+                            animated
+                        />
+                    </SafeAreaProvider>
+                </ThemeProvider>
+            </PersistGate>
         </Provider>
     )
 }
-
-export default App

@@ -10,10 +10,10 @@ import { displayLocalNotification } from '../../hooks/useNotifications'
 
 const NotificationButton = () => {
     const dispatch = useDispatch()
-    const { customer, isLoggedIn } = useSelector((state) => state.customer)
+    const { user, isLoggedIn } = useSelector((state) => state.auth)
 
     const handleManualNotification = async () => {
-        if (!isLoggedIn || !customer?._id) {
+        if (!isLoggedIn || !user?._id) {
             console.log('User is not logged in or missing customer info')
             return
         }
@@ -39,8 +39,13 @@ const NotificationButton = () => {
     }
 
     return (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Button title="Trigger Notification" onPress={handleManualNotification} />
+        <View
+            style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+        >
+            <Button
+                title="Trigger Notification"
+                onPress={handleManualNotification}
+            />
         </View>
     )
 }

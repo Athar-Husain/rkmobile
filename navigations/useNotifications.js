@@ -19,7 +19,6 @@ const avatarIcon = require('../assets/icons/apple.png')
 export const displayLocalNotification = async (remoteMessage) => {
     console.log('remoteMessage in console ', remoteMessage)
 
-    
     const data = remoteMessage?.data || {}
     const notification = remoteMessage?.notification || {}
 
@@ -83,11 +82,11 @@ export const displayLocalNotification = async (remoteMessage) => {
 
 export const useNotifications = () => {
     const dispatch = useDispatch()
-    const { customer, isLoggedIn } = useSelector((state) => state.customer)
+    const { user, isLoggedIn } = useSelector((state) => state.auth)
     const initialHandled = useRef(false)
 
     useEffect(() => {
-        if (!isLoggedIn || !customer?._id) return
+        if (!isLoggedIn || !user?._id) return
 
         console.log('🔔 Setting up notification listeners...')
 
@@ -144,7 +143,7 @@ export const useNotifications = () => {
             unsubscribeNotificationTap()
             unsubscribeTokenRefresh()
         }
-    }, [dispatch, customer, isLoggedIn])
+    }, [dispatch, user, isLoggedIn])
 }
 
 export default useNotifications

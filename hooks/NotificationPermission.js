@@ -4,7 +4,7 @@ import messaging from '@react-native-firebase/messaging'
 import notifee, { AuthorizationStatus } from '@notifee/react-native'
 import { PermissionsAndroid, Platform, Alert, Linking } from 'react-native'
 
-export async function requestUserPermission() {
+export async function requestUserPermission1() {
     try {
         let granted = false
 
@@ -64,6 +64,80 @@ export async function requestUserPermission() {
 
             if (granted) {
                 await getFCMToken()
+            }
+            return granted
+        }
+
+        return false
+    } catch (error) {
+        console.error('Error requesting permissions:', error)
+        return false
+    }
+}
+
+export async function requestUserPermission() {
+    try {
+        let granted = false
+
+        if (Platform.OS === 'android') {
+            // Android 13+ (API 33) requires POST_NOTIFICATIONS permission
+            if (Platform.Version >= 33) {
+                const permission = await PermissionsAndroid.request(
+                    PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+                )
+                if (permission === PermissionsAndroid.RESULTS.GRANTED) {
+                    granted = true
+                } else {
+                    granted = false
+                }
+            } else {
+                granted = true
+            }
+
+            // Notifee permission (for heads-up notifications)
+            const notifeeSettings = await notifee.requestPermission({
+                alert: true,
+                badge: true,
+                sound: true,
+                announcement: true,
+            })
+
+            if (
+                (notifeeSettings.authorizationStatus ?? 0) >=
+                AuthorizationStatus.AUTHORIZED
+            ) {
+                granted = granted && true
+                await getFCMToken()
+                // Now, send the FCM token to the server
+                await sendFCMTokenToServer()
+                return true
+            }
+            return false
+        } else if (Platform.OS === 'ios') {
+            // iOS permissions
+            const authStatus = await messaging().requestPermission({
+                alert: true,
+                badge: true,
+                sound: true,
+                announcement: true,
+                criticalAlert: true,
+            })
+
+            const notifeeSettings = await notifee.requestPermission({
+                alert: true,
+                badge: true,
+                sound: true,
+                criticalAlert: true,
+            })
+
+            granted =
+                authStatus >= AuthorizationStatus.AUTHORIZED &&
+                (notifeeSettings.authorizationStatus ?? 0) >=
+                    AuthorizationStatus.AUTHORIZED
+
+            if (granted) {
+                await getFCMToken()
+                await sendFCMTokenToServer()
             }
             return granted
         }

@@ -1,189 +1,99 @@
-// BottomTabNavigation.js
 import React from 'react'
-import { View, Platform, Image, Text, StyleSheet } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { COLORS, FONTS, icons } from '../constants'
-import {
-    Bookings,
-    Favourite,
-    HelpCenter,
-    Home,
-    Inbox,
-    Profile,
-} from '../screens'
-import { useTheme } from '../theme/ThemeProvider'
-import BillingScreen from '../screens/Billing'
-import ReferralsScreen from '../screens/Referral'
-import Menu from '../screens/Menu'
-// import Menu from '../screens/Profile'
+import { Platform, StyleSheet, View } from 'react-native'
+import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
+
+// Import screens
+import { Home } from '../screens'
+import CouponsScreen from '../screens/CouponsScreen'
+import ShopsScreen from '../screens/ShopsScreen'
+import AlertsScreen from '../screens/AlertsScreen'
+import OrderHistoryScreen from '../screens/OrderHistoryScreen'
 
 const Tab = createBottomTabNavigator()
 
-// Helper function to define common tab bar icon/label styling
-const getTabBarIcon = (focused, iconSource, label, darkTheme) => (
-    <View style={styles.tabIconContainer}>
-        <Image
-            source={iconSource}
-            resizeMode="contain"
-            style={[
-                styles.tabIcon,
-                {
-                    tintColor: focused
-                        ? COLORS.primary
-                        : darkTheme
-                          ? COLORS.gray3
-                          : COLORS.gray3,
-                },
-            ]}
-        />
-        <Text
-            style={[
-                styles.tabLabel,
-                {
-                    color: focused
-                        ? COLORS.primary
-                        : darkTheme
-                          ? COLORS.gray3
-                          : COLORS.gray3,
-                },
-            ]}
-        >
-            {label}
-        </Text>
-    </View>
-)
-
-// Define the central Home/Dashboard tab separately for consistent styling
-const CentralHomeTab = ({ focused }) => (
-    <View style={styles.centralButtonContainer}>
-        <View style={styles.centralButton}>
-            <Image
-                source={focused ? icons.dashboard : icons.dashboard2}
-                resizeMode="contain"
-                style={styles.centralButtonIcon}
-            />
-        </View>
-    </View>
-)
+// Optimization: Use a map for icons to keep the component clean
+const TAB_ICONS = {
+    Home: { active: 'home', inactive: 'home-outline' },
+    Coupons: { active: 'ticket-percent', inactive: 'ticket-percent-outline' },
+    Shops: { active: 'store', inactive: 'store-outline' },
+    Alerts: { active: 'bell', inactive: 'bell-outline' },
+    Orders: { active: 'clipboard-text', inactive: 'clipboard-text-outline' },
+}
 
 const BottomTabNavigation = () => {
-    const { dark } = useTheme()
-
     return (
         <Tab.Navigator
-            initialRouteName="Home"
-            screenOptions={{
-                tabBarShowLabel: false,
+            screenOptions={({ route }) => ({
                 headerShown: false,
-                tabBarStyle: [
-                    styles.tabBar,
-                    { backgroundColor: dark ? COLORS.dark1 : COLORS.white },
-                ],
-            }}
+                tabBarActiveTintColor: '#004AAD',
+                tabBarInactiveTintColor: '#9DA3B4',
+                tabBarShowLabel: true,
+                tabBarLabelStyle: styles.tabLabel,
+                tabBarStyle: styles.tabBar,
+                tabBarIcon: ({ focused, color, size }) => {
+                    const iconConfig = TAB_ICONS[route.name]
+                    const iconName = focused
+                        ? iconConfig.active
+                        : iconConfig.inactive
+
+                    return (
+                        <View
+                            style={focused ? styles.activeIconContainer : null}
+                        >
+                            <MaterialCommunityIcons
+                                name={iconName}
+                                size={26}
+                                color={color}
+                            />
+                        </View>
+                    )
+                },
+            })}
         >
+            <Tab.Screen name="Home" component={Home} />
+            <Tab.Screen name="Coupons" component={CouponsScreen} />
+            <Tab.Screen name="Shops" component={ShopsScreen} />
+            <Tab.Screen name="Orders" component={OrderHistoryScreen} />
             <Tab.Screen
-                name="Help"
-                component={HelpCenter}
-                options={{
-                    tabBarIcon: ({ focused }) =>
-                        getTabBarIcon(focused, icons.headset, 'Help', dark),
-                }}
-            />
-            <Tab.Screen
-                name="Billing"
-                component={BillingScreen}
-                options={{
-                    tabBarIcon: ({ focused }) =>
-                        getTabBarIcon(
-                            focused,
-                            icons.walletOutline,
-                            'Billing',
-                            dark
-                        ),
-                }}
-            />
-            <Tab.Screen
-                name="Home"
-                component={Home}
-                options={{
-                    tabBarIcon: ({ focused }) => CentralHomeTab({ focused }),
-                }}
-            />
-            <Tab.Screen
-                name="Referrals"
-                component={ReferralsScreen}
-                options={{
-                    tabBarIcon: ({ focused }) =>
-                        getTabBarIcon(
-                            focused,
-                            focused ? icons.people : icons.people2,
-                            'Referrals',
-                            dark
-                        ),
-                }}
-            />
-            <Tab.Screen
-                name="Menu"
-                component={Menu}
-                options={{
-                    tabBarIcon: ({ focused }) =>
-                        getTabBarIcon(
-                            focused,
-                            focused ? icons.menu : icons.moreVertical,
-                            'Menu',
-                            dark
-                        ),
-                }}
+                name="Alerts"
+                component={AlertsScreen}
+                options={{ tabBarBadge: 3, tabBarBadgeStyle: styles.badge }}
             />
         </Tab.Navigator>
     )
 }
 
 const styles = StyleSheet.create({
-    tabIconContainer: {
-        alignItems: 'center',
-    },
-    tabIcon: {
-        height: 24,
-        width: 24,
+    tabBar: {
+        position: 'absolute', // Makes it look floating if combined with bottom margin
+        height: Platform.OS === 'ios' ? 88 : 70,
+        paddingBottom: Platform.OS === 'ios' ? 30 : 12,
+        paddingTop: 10,
+        backgroundColor: '#ffffff',
+        borderTopWidth: 0, // Remove default line
+        elevation: 20, // Stronger shadow for Android
+        shadowColor: '#000', // Shadow for iOS
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
     },
     tabLabel: {
-        ...FONTS.body4,
+        fontSize: 11,
+        fontWeight: '600',
+        marginTop: -4,
     },
-    centralButtonContainer: {
-        alignItems: 'center',
-        marginTop: -20,
+    activeIconContainer: {
+        // Optional: Add a subtle background circle for the active icon
+        // backgroundColor: '#F0F5FF',
+        // padding: 8,
+        // borderRadius: 15,
     },
-    centralButton: {
-        height: 60,
-        width: 60,
-        borderRadius: 30,
-        backgroundColor: COLORS.primary,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 10,
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.5,
-        elevation: 5,
-    },
-    centralButtonIcon: {
-        height: 30,
-        width: 30,
-        tintColor: COLORS.white,
-    },
-    tabBar: {
-        position: 'absolute',
-        justifyContent: 'center',
-        bottom: 0,
-        right: 0,
-        left: 0,
-        elevation: 0,
-        height: Platform.OS === 'ios' ? 90 : 60,
-        borderTopColor: 'transparent',
+    badge: {
+        backgroundColor: '#E91E63',
+        color: 'white',
+        fontSize: 10,
+        lineHeight: 15,
     },
 })
 

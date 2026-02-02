@@ -13,6 +13,9 @@ import {
     CreateNewPIN,
     Fingerprint,
 } from '../screens'
+import OtpVerify from '../screens/OtpVerify'
+import FinalSignupScreen from '../screens/FinalSignupScreen'
+import VerifyOTPScreen from '../screens/VerifyOTPScreen'
 
 const Stack = createNativeStackNavigator()
 
@@ -21,6 +24,10 @@ const AuthStack = () => (
         <Stack.Screen name="Welcome" component={Welcome} />
         <Stack.Screen name="Login" component={Login} />
         <Stack.Screen name="Signup" component={Signup} />
+        {/* <Stack.Screen name="OTPVerification" component={OTPVerification} /> */}
+        <Stack.Screen name="VerifyOTP" component={OtpVerify} />
+        <Stack.Screen name="VerifyOTPScreen" component={VerifyOTPScreen} />
+        <Stack.Screen name="FinalSignup" component={FinalSignupScreen} />
         <Stack.Screen
             name="ForgotPasswordMethods"
             component={ForgotPasswordMethods}

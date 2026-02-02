@@ -1,7 +1,7 @@
 import axios from 'axios'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { BASE_API_URL } from '../../../utils/baseurl.js'
-import { TokenManager } from '../Customers/CustomerService'
+import { TokenManager } from '../../../utils/tokenManager.js'
+// import { TokenManager } from '../Customers/CustomerService'
 
 const CONNECTION_URL = `${BASE_API_URL}/api/connections`
 

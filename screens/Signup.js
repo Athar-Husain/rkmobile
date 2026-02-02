@@ -1,3 +1,4 @@
+import React, { useEffect, useState } from 'react'
 import {
     View,
     Text,
@@ -6,310 +7,370 @@ import {
     Image,
     Alert,
     TouchableOpacity,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native'
-import React, { useCallback, useEffect, useReducer, useState } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { COLORS, SIZES, icons, images } from '../constants'
-import Header from '../components/Header'
-import { reducer } from '../utils/reducers/formReducers'
-import { validateInput } from '../utils/actions/formActions'
-import Input from '../components/Input'
+import { useNavigation } from '@react-navigation/native'
+import { useDispatch, useSelector } from 'react-redux'
+import { useForm, Controller } from 'react-hook-form'
 import Checkbox from 'expo-checkbox'
+
+import Header from '../components/Header'
+import Input from '../components/Input'
 import Button from '../components/Button'
-import SocialButton from '../components/SocialButton'
-import OrSeparator from '../components/OrSeparator'
+import CityModal from '../components/CityModal'
+import AreaModal from '../components/AreaModal'
+
+import { COLORS, icons, images } from '../constants'
 import { useTheme } from '../theme/ThemeProvider'
+import {
+    getAreasByCity,
+    getCities,
+} from '../redux/features/CityAreas/CityAreaSlice'
+import { signupSendOTP, setTempToken } from '../redux/features/Auth/AuthSlice'
 
-const isTestMode = true
-
-const initialState = {
-    inputValues: {
-        email: isTestMode ? 'example@gmail.com' : '',
-        password: isTestMode ? '**********' : '',
-    },
-    inputValidities: {
-        email: false,
-        password: false,
-    },
-    formIsValid: false,
-}
-
-const Signup = ({ navigation }) => {
-    const [formState, dispatchFormState] = useReducer(reducer, initialState)
-    const [isLoading, setIsLoading] = useState(false)
-    const [error, setError] = useState(null)
+const Signup = () => {
+    const navigation = useNavigation()
+    const dispatch = useDispatch()
+    const { colors } = useTheme()
     const [isChecked, setChecked] = useState(false)
-    const { colors, dark } = useTheme()
+    const [modalVisible, setModalVisible] = useState(null)
 
-    const inputChangedHandler = useCallback(
-        (inputId, inputValue) => {
-            const result = validateInput(inputId, inputValue)
-            dispatchFormState({ inputId, validationResult: result, inputValue })
+    const { cities, areas } = useSelector((state) => state.cityarea)
+    const { loading: authLoading } = useSelector((state) => state.auth)
+
+    const {
+        control,
+        handleSubmit,
+        watch,
+        setValue,
+        formState: { errors },
+    } = useForm({
+        defaultValues: {
+            name: '',
+            email: '',
+            phone: '',
+            password: '',
+            city: null,
+            area: null,
+            referralCode: '',
         },
-        [dispatchFormState]
-    )
+    })
+
+    const selectedCity = watch('city')
 
     useEffect(() => {
-        if (error) {
-            Alert.alert('An error occured', error)
+        dispatch(getCities())
+    }, [dispatch])
+
+    useEffect(() => {
+        if (selectedCity?.id) {
+            dispatch(getAreasByCity(selectedCity.id))
+            setValue('area', null)
         }
-    }, [error])
+    }, [selectedCity?.id, dispatch, setValue])
 
-    // implementing apple authentication
-    const appleAuthHandler = () => {
-        console.log('Apple Authentication')
-    }
+    const handleSignup = async (data) => {
+        if (!isChecked) {
+            Alert.alert('Required', 'Please accept the Terms & Privacy Policy')
+            return
+        }
 
-    // implementing facebook authentication
-    const facebookAuthHandler = () => {
-        console.log('Facebook Authentication')
-    }
+        const payload = {
+            name: data.name.trim(),
+            email: data.email.toLowerCase().trim(),
+            mobile: data.phone.trim(),
+            password: data.password,
+            city_id: data.city.id,
+            area_id: data.area.id,
+            referralCode: data.referralCode || undefined,
+        }
 
-    // Implementing google authentication
-    const googleAuthHandler = () => {
-        console.log('Google Authentication')
+        try {
+            const result = await dispatch(signupSendOTP(payload)).unwrap()
+
+            if (result?.tempToken) {
+                dispatch(setTempToken(result.tempToken))
+                navigation.navigate('VerifyOTPScreen', {
+                    email: payload.email,
+                    cityName: data.city.name,
+                    areaName: data.area.name,
+                    purpose: 'SIGNUP',
+                })
+            }
+        } catch (error) {
+            Alert.alert('Signup Failed', error || 'Please try again')
+        }
     }
 
     return (
         <SafeAreaView
             style={[styles.area, { backgroundColor: colors.background }]}
         >
-            <View
-                style={[
-                    styles.container,
-                    { backgroundColor: colors.background },
-                ]}
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={styles.container}
             >
-                <Header />
-                <ScrollView showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{ paddingBottom: 40 }}
+                >
+                    <Header
+                        title="Create Account"
+                        onPress={() => navigation.goBack()}
+                    />
+
                     <View style={styles.logoContainer}>
-                        <Image
-                            source={images.logo}
-                            resizeMode="contain"
-                            style={styles.logo}
-                        />
-                    </View>
-                    <Text
-                        style={[
-                            styles.title,
-                            {
-                                color: dark ? COLORS.white : COLORS.black,
-                            },
-                        ]}
-                    >
-                        Create Your Account
-                    </Text>
-                    <Input
-                        id="email"
-                        onInputChanged={inputChangedHandler}
-                        errorText={formState.inputValidities['email']}
-                        placeholder="Email"
-                        placeholderTextColor={
-                            dark ? COLORS.grayTie : COLORS.black
-                        }
-                        icon={icons.email}
-                        keyboardType="email-address"
-                    />
-                    <Input
-                        onInputChanged={inputChangedHandler}
-                        errorText={formState.inputValidities['password']}
-                        autoCapitalize="none"
-                        id="password"
-                        placeholder="Password"
-                        placeholderTextColor={
-                            dark ? COLORS.grayTie : COLORS.black
-                        }
-                        icon={icons.padlock}
-                        secureTextEntry={true}
-                    />
-                    <View style={styles.checkBoxContainer}>
-                        <View style={{ flexDirection: 'row' }}>
-                            <Checkbox
-                                style={styles.checkbox}
-                                value={isChecked}
-                                color={
-                                    isChecked
-                                        ? COLORS.primary
-                                        : dark
-                                          ? COLORS.primary
-                                          : 'gray'
-                                }
-                                onValueChange={setChecked}
-                            />
-                            <View style={{ flex: 1 }}>
-                                <Text
-                                    style={[
-                                        styles.privacy,
-                                        {
-                                            color: dark
-                                                ? COLORS.white
-                                                : COLORS.black,
-                                        },
-                                    ]}
-                                >
-                                    By continuing you accept our Privacy Policy
-                                </Text>
-                            </View>
-                        </View>
-                    </View>
-                    <Button
-                        title="Sign Up"
-                        filled
-                        onPress={() => navigation.navigate('FillYourProfile')}
-                        style={styles.button}
-                    />
-                    {/* <View>
-                        <OrSeparator text="or continue with" />
-                        <View style={styles.socialBtnContainer}>
-                            <SocialButton
-                                icon={icons.appleLogo}
-                                onPress={appleAuthHandler}
-                                tintColor={dark ? COLORS.white : COLORS.black}
-                            />
-                            <SocialButton
-                                icon={icons.facebook}
-                                onPress={facebookAuthHandler}
-                            />
-                            <SocialButton
-                                icon={icons.google}
-                                onPress={googleAuthHandler}
-                            />
-                        </View>
-                    </View> */}
-                    <View style={styles.bottomContainer}>
-                        <Text
-                            style={[
-                                styles.bottomLeft,
-                                {
-                                    color: dark ? COLORS.white : COLORS.black,
-                                },
-                            ]}
-                        >
-                            Already have an account ?
+                        <Image source={images.logo} style={styles.logo} />
+                        <Text style={[styles.subtitle, { color: colors.text }]}>
+                            Your Trusted Electronics Partner
                         </Text>
+                    </View>
+
+                    {/* Name Field */}
+                    <Controller
+                        control={control}
+                        name="name"
+                        rules={{
+                            required: 'Full name is required',
+                            minLength: {
+                                value: 3,
+                                message: 'Name must be at least 3 characters',
+                            },
+                        }}
+                        render={({ field: { onChange, value } }) => (
+                            <Input
+                                placeholder="Full Name"
+                                icon={icons.user}
+                                value={value}
+                                onInputChanged={(_, v) => onChange(v)}
+                                errorText={errors.name?.message}
+                            />
+                        )}
+                    />
+
+                    {/* Mobile Field */}
+                    <Controller
+                        control={control}
+                        name="phone"
+                        rules={{
+                            required: 'Mobile number is required',
+                            pattern: {
+                                value: /^[0-9]{10}$/,
+                                message: 'Enter a valid 10-digit mobile number',
+                            },
+                        }}
+                        render={({ field: { onChange, value } }) => (
+                            <Input
+                                placeholder="Mobile Number"
+                                icon={icons.call}
+                                keyboardType="phone-pad"
+                                maxLength={10}
+                                value={value}
+                                onInputChanged={(_, v) =>
+                                    onChange(v.replace(/[^0-9]/g, ''))
+                                }
+                                errorText={errors.phone?.message}
+                            />
+                        )}
+                    />
+
+                    {/* Email Field */}
+                    <Controller
+                        control={control}
+                        name="email"
+                        rules={{
+                            required: 'Email address is required',
+                            pattern: {
+                                value: /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+                                message: 'Please enter a valid email',
+                            },
+                        }}
+                        render={({ field: { onChange, value } }) => (
+                            <Input
+                                placeholder="Email Address"
+                                icon={icons.email}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                value={value}
+                                onInputChanged={(_, v) => onChange(v)}
+                                errorText={errors.email?.message}
+                            />
+                        )}
+                    />
+
+                    {/* Password Field */}
+                    <Controller
+                        control={control}
+                        name="password"
+                        rules={{
+                            required: 'Password is required',
+                            minLength: {
+                                value: 6,
+                                message:
+                                    'Password must be at least 6 characters',
+                            },
+                        }}
+                        render={({ field: { onChange, value } }) => (
+                            <Input
+                                placeholder="Password"
+                                icon={icons.padlock}
+                                secureTextEntry
+                                value={value}
+                                onInputChanged={(_, v) => onChange(v)}
+                                errorText={errors.password?.message}
+                            />
+                        )}
+                    />
+
+                    {/* City Selection */}
+                    <Controller
+                        control={control}
+                        name="city"
+                        rules={{ required: 'Please select a city' }}
+                        render={({ field: { value } }) => (
+                            <TouchableOpacity
+                                onPress={() => setModalVisible('city')}
+                            >
+                                <View pointerEvents="none">
+                                    <Input
+                                        placeholder="Select City"
+                                        icon={icons.location}
+                                        value={value?.name || ''}
+                                        editable={false}
+                                        errorText={errors.city?.message}
+                                    />
+                                </View>
+                            </TouchableOpacity>
+                        )}
+                    />
+
+                    {/* Area Selection */}
+                    <Controller
+                        control={control}
+                        name="area"
+                        rules={{ required: 'Please select an area' }}
+                        render={({ field: { value } }) => (
+                            <TouchableOpacity
+                                disabled={!selectedCity}
+                                onPress={() => setModalVisible('area')}
+                                style={{ opacity: selectedCity ? 1 : 0.6 }}
+                            >
+                                <View pointerEvents="none">
+                                    <Input
+                                        placeholder={
+                                            selectedCity
+                                                ? 'Select Area'
+                                                : 'Select city first'
+                                        }
+                                        icon={icons.location}
+                                        value={value?.name || ''}
+                                        editable={false}
+                                        errorText={errors.area?.message}
+                                    />
+                                </View>
+                            </TouchableOpacity>
+                        )}
+                    />
+
+                    {/* Referral Code (Optional) */}
+                    <Controller
+                        control={control}
+                        name="referralCode"
+                        render={({ field: { onChange, value } }) => (
+                            <Input
+                                placeholder="Referral Code (Optional)"
+                                icon={icons.gift || null} // Use gift icon if available
+                                value={value}
+                                onInputChanged={(_, v) => onChange(v)}
+                            />
+                        )}
+                    />
+
+                    {/* Terms & Conditions */}
+                    <View style={styles.privacyContainer}>
+                        <Checkbox
+                            value={isChecked}
+                            onValueChange={setChecked}
+                            color={isChecked ? COLORS.primary : undefined}
+                            style={styles.checkbox}
+                        />
                         <TouchableOpacity
-                            onPress={() => navigation.navigate('Login')}
+                            onPress={() => setChecked(!isChecked)}
                         >
-                            <Text style={styles.bottomRight}> Sign In</Text>
+                            <Text
+                                style={[
+                                    styles.privacyText,
+                                    { color: colors.text },
+                                ]}
+                            >
+                                I agree to{' '}
+                                <Text style={styles.link}>
+                                    Terms & Privacy Policy
+                                </Text>
+                            </Text>
                         </TouchableOpacity>
                     </View>
+
+                    <Button
+                        title={
+                            authLoading
+                                ? 'Creating Account...'
+                                : 'Create Account'
+                        }
+                        onPress={handleSubmit(handleSignup)}
+                        disabled={authLoading}
+                        style={styles.signupBtn}
+                    />
                 </ScrollView>
-                {/* <View style={styles.bottomContainer}>
-                    <Text
-                        style={[
-                            styles.bottomLeft,
-                            {
-                                color: dark ? COLORS.white : COLORS.black,
-                            },
-                        ]}
-                    >
-                        Already have an account ?
-                    </Text>
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate('Login')}
-                    >
-                        <Text style={styles.bottomRight}> Sign In</Text>
-                    </TouchableOpacity>
-                </View> */}
-            </View>
+
+                {/* Modals */}
+                <CityModal
+                    visible={modalVisible === 'city'}
+                    cities={cities}
+                    onClose={() => setModalVisible(null)}
+                    onSelect={(city) => {
+                        setValue('city', { id: city._id, name: city.city })
+                        setModalVisible(null)
+                    }}
+                />
+
+                <AreaModal
+                    visible={modalVisible === 'area'}
+                    areas={areas}
+                    selectedCity={selectedCity}
+                    onClose={() => setModalVisible(null)}
+                    onSelect={(area) => {
+                        setValue('area', { id: area._id, name: area.name })
+                        setModalVisible(null)
+                    }}
+                />
+            </KeyboardAvoidingView>
         </SafeAreaView>
     )
 }
 
 const styles = StyleSheet.create({
-    area: {
-        flex: 1,
-        backgroundColor: COLORS.white,
-    },
-    container: {
-        flex: 1,
-        padding: 16,
-        backgroundColor: COLORS.white,
-    },
-    logo: {
-        width: 100,
-        height: 100,
-        // tintColor: COLORS.primary
-    },
-    logoContainer: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginVertical: 32,
-    },
-    title: {
-        fontSize: 28,
-        fontFamily: 'bold',
-        color: COLORS.black,
-        textAlign: 'center',
-    },
-    center: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    title: {
-        fontSize: 26,
-        fontFamily: 'semiBold',
-        color: COLORS.black,
-        textAlign: 'center',
-        marginBottom: 22,
-    },
-    checkBoxContainer: {
+    area: { flex: 1 },
+    container: { flex: 1, paddingHorizontal: 20 },
+    logoContainer: { alignItems: 'center', marginVertical: 20 },
+    logo: { width: 100, height: 100, resizeMode: 'contain' },
+    subtitle: { fontSize: 14, marginTop: 5, opacity: 0.8 },
+    privacyContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
         alignItems: 'center',
-        marginVertical: 18,
+        marginVertical: 15,
+        paddingHorizontal: 5,
     },
     checkbox: {
-        marginRight: 8,
-        height: 16,
-        width: 16,
+        width: 20,
+        height: 20,
         borderRadius: 4,
-        borderColor: COLORS.primary,
-        borderWidth: 2,
     },
-    privacy: {
-        fontSize: 12,
-        fontFamily: 'regular',
-        color: COLORS.black,
-    },
-    socialTitle: {
-        fontSize: 19.25,
-        fontFamily: 'medium',
-        color: COLORS.black,
-        textAlign: 'center',
-        marginVertical: 26,
-    },
-    socialBtnContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    bottomContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginVertical: 18,
-        // position: 'absolute',
-        // bottom: 12,
-        // right: 0,
-        // left: 0,
-    },
-    bottomLeft: {
-        fontSize: 14,
-        fontFamily: 'regular',
-        color: 'black',
-    },
-    bottomRight: {
-        fontSize: 16,
-        fontFamily: 'medium',
-        color: COLORS.primary,
-    },
-    button: {
-        marginVertical: 6,
-        width: SIZES.width - 32,
-        borderRadius: 30,
-    },
+    privacyText: { marginLeft: 10, fontSize: 13 },
+    link: { color: COLORS.primary, fontWeight: 'bold' },
+    signupBtn: { marginTop: 10 },
 })
 
 export default Signup

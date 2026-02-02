@@ -1,0 +1,72 @@
+{
+    "expo": {
+        "name": "RK Electronics",
+        "slug": "rk-electronics",
+        "version": "1.0.0",
+        "orientation": "portrait",
+        "icon": "./assets/images/icon.png",
+        "userInterfaceStyle": "automatic",
+
+        "splash": {
+            "image": "./assets/images/splash.png",
+            "resizeMode": "contain",
+            "backgroundColor": "#ffffff"
+        },
+
+        "assetBundlePatterns": ["**/*"],
+
+        "ios": {
+            "supportsTablet": true,
+            "bundleIdentifier": "com.rkelectronics.app",
+            "googleServicesFile": "./GoogleService-Info.plist",
+            "infoPlist": {
+                "UIBackgroundModes": ["remote-notification"],
+                "NSCameraUsageDescription": "This app needs camera access.",
+                "NSPhotoLibraryUsageDescription": "This app needs photo access."
+            },
+            "entitlements": {
+                "aps-environment": "production"
+            }
+        },
+
+        "android": {
+            "package": "com.rkelectronics.app",
+            "googleServicesFile": "./google-services.json",
+            "adaptiveIcon": {
+                "foregroundImage": "./assets/images/adaptive-icon.png",
+                "backgroundColor": "#335EF7"
+            },
+            "permissions": ["CAMERA", "RECORD_AUDIO", "POST_NOTIFICATIONS"],
+            "notification": {
+                "icon": "./assets/images/icon.png",
+                "color": "#335EF7"
+            }
+        },
+
+        "plugins": [
+            "@react-native-firebase/app",
+            "@react-native-firebase/messaging",
+            [
+                "expo-build-properties",
+                {
+                    "android": {
+                        "compileSdkVersion": 34,
+                        "targetSdkVersion": 34,
+                        "minSdkVersion": 23
+                    },
+                    "ios": {
+                        "useFrameworks": "static"
+                    }
+                }
+            ]
+        ],
+
+        "extra": {
+            "eas": {
+                "projectId": "PUT_REAL_UUID_HERE"
+            }
+        },
+
+        "owner": "xyz"
+    }
+}

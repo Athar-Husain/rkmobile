@@ -6,68 +6,54 @@ import AuthStack from './AuthStack'
 import MainStack from './MainStack'
 import OnboardingStack from './OnboardingStack'
 import { COLORS } from '../constants'
-import { initializeApplication } from '../redux/features/Customers/CustomerSlice'
-import { useNotifications } from '../hooks/useNotifications'
-import { requestUserPermission } from '../hooks/NotificationPermission.js'
+import {
+    initializeApplication,
+    setAppReady,
+} from '../redux/features/Auth/AuthSlice'
+import { Text } from 'react-native'
 
 const AppNavigation = () => {
     const dispatch = useDispatch()
-    const { isLoggedIn, isLoading, hasCompletedOnboarding } = useSelector(
-        (state) => state.customer
-    )
+    const { isLoggedIn, isAppReady, isInitializing, hasCompletedOnboarding } =
+        useSelector((state) => state.auth)
 
-    console.log('isLoggedIn', isLoggedIn)
-
-    // ==========================================
-    // Initialize App on Mount
-    // ==========================================
     useEffect(() => {
-        dispatch(initializeApplication())
+        const initApp = async () => {
+            try {
+                await dispatch(initializeApplication()).unwrap()
+            } catch (error) {
+                console.log('App initialization error:', error)
+                // Even if initialization fails, mark app as ready
+                dispatch(setAppReady())
+            }
+        }
+
+        initApp()
     }, [dispatch])
 
-    // ==========================================
-    // Request Permission AFTER Login
-    // ==========================================
-    useEffect(() => {
-        if (isLoggedIn) {
-            // Request permission after user is logged in
-            requestUserPermission()
-        }
-    }, [isLoggedIn])
-
-    // ==========================================
-    // Setup Notifications Hook (only when logged in)
-    // ==========================================
-    useEffect(() => {
-        if (isLoggedIn) {
-            // This will safely call useNotifications only when the user is logged in
-            useNotifications() // Make sure this is invoked correctly in useEffect
-        }
-    }, [isLoggedIn]) // Dependency on isLoggedIn, so it runs after login
-
-    // ==========================================
-    // Loading State
-    // ==========================================
-    if (isLoading || hasCompletedOnboarding === null) {
+    // Show loading screen while initializing
+    if (!isAppReady || isInitializing) {
         return (
             <View style={styles.loaderContainer}>
                 <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text style={styles.loadingText}>Loading...</Text>
             </View>
         )
     }
 
-    // ==========================================
-    // Navigation Tree
-    // ==========================================
+    // If onboarding not completed, show onboarding
+    if (!hasCompletedOnboarding) {
+        return (
+            <NavigationContainer>
+                <OnboardingStack />
+            </NavigationContainer>
+        )
+    }
+
+    // If logged in, show main app, otherwise auth
     return (
         <NavigationContainer>
-            {isLoggedIn ? (
-                <MainStack />
-            ) : hasCompletedOnboarding ? (
-                <AuthStack />
-            ) : (
-                <OnboardingStack />
-            )}
+            {isLoggedIn ? <MainStack /> : <AuthStack />}
         </NavigationContainer>
     )
 }
@@ -78,6 +64,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#fff',
+    },
+    loadingText: {
+        marginTop: 12,
+        fontSize: 16,
+        color: COLORS.primary,
     },
 })
 
