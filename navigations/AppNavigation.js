@@ -1,3 +1,4 @@
+// navigations/AppNavigation.js
 import React, { useEffect } from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import { useSelector, useDispatch } from 'react-redux'
@@ -8,14 +9,24 @@ import OnboardingStack from './OnboardingStack'
 import { COLORS } from '../constants'
 import {
     initializeApplication,
+    selectUserType,
     setAppReady,
 } from '../redux/features/Auth/AuthSlice'
 import { Text } from 'react-native'
+import StaffStack from './StaffStack'
 
 const AppNavigation = () => {
     const dispatch = useDispatch()
-    const { isLoggedIn, isAppReady, isInitializing, hasCompletedOnboarding } =
-        useSelector((state) => state.auth)
+    const {
+        isLoggedIn,
+        user,
+        isAppReady,
+        isInitializing,
+        hasCompletedOnboarding,
+    } = useSelector((state) => state.auth)
+
+    const userType = user?.userType
+    console.log('userType', user?.userType)
 
     useEffect(() => {
         const initApp = async () => {
@@ -53,8 +64,17 @@ const AppNavigation = () => {
     // If logged in, show main app, otherwise auth
     return (
         <NavigationContainer>
-            {isLoggedIn ? <MainStack /> : <AuthStack />}
+            {!isLoggedIn ? (
+                <AuthStack />
+            ) : userType === 'staff' ? (
+                <StaffStack />
+            ) : (
+                <MainStack />
+            )}
         </NavigationContainer>
+        // <NavigationContainer>
+        //     {isLoggedIn ? <MainStack /> : <AuthStack />}
+        // </NavigationContainer>
     )
 }
 

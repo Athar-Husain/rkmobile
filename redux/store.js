@@ -23,6 +23,7 @@ import userReducer from './features/Users/UserSlice'
 import cityAreaReducer from './features/CityAreas/CityAreaSlice'
 import couponReducer from './features/Coupons/CouponSlice'
 import storeReducer from './features/Stores/StoreSlice'
+import purchaseReducer from './features/Purchases/PurchaseSlice'
 
 // Define persist configs
 const persistConfigs = {
@@ -50,6 +51,7 @@ const reducers = {
     cityarea: cityAreaReducer,
     coupon: couponReducer,
     store: storeReducer,
+    purchase: purchaseReducer,
 }
 
 // Wrap reducers that need persistence automatically

@@ -1,3 +1,4 @@
+// utils/requestNotificationPermission
 import { Platform } from 'react-native'
 import messaging from '@react-native-firebase/messaging'
 import notifee, { AuthorizationStatus } from '@notifee/react-native'

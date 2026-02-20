@@ -26,7 +26,7 @@ const Menu = ({ navigation }) => {
     const handleLogout = async () => {
         try {
             await dispatch(logout()).unwrap()
-            refRBSheet.current.close()
+            // refRBSheet.current.close()
         } catch (error) {
             console.error('Logout failed', error)
         }

@@ -88,6 +88,16 @@ const Profile = () => {
                         color={textColor}
                     />
                 </TouchableOpacity>
+                {/* <TouchableOpacity
+                    onPress={() => navigation.navigate('MyBookings')}
+                    style={styles.roundBtn}
+                >
+                    <MaterialCommunityIcons
+                        name="arrow-left"
+                        size={24}
+                        color={textColor}
+                    />
+                </TouchableOpacity> */}
                 <Text style={[styles.headerTitle, { color: textColor }]}>
                     My Profile
                 </Text>
@@ -168,7 +178,9 @@ const Profile = () => {
                     style={styles.logoutButton}
                     onPress={handleLogout}
                 >
-                    <Text style={styles.logoutButtonText}>Log Out Account</Text>
+                    <Text style={styles.logoutButtonText}>
+                        Log Out fr Account
+                    </Text>
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>

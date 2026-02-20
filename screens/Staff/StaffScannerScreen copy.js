@@ -18,7 +18,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import {
     validateForStaffAction,
     redeemCouponStaff,
-} from '../../redux/features/Coupons/CouponSlice'
+} from '../redux/features/Coupons/CouponSlice'
 
 const StaffScannerScreen = () => {
     const dispatch = useDispatch()

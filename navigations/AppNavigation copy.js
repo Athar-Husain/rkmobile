@@ -1,3 +1,4 @@
+// navigations/AppNavigation.js 
 import React, { useEffect } from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import { useSelector, useDispatch } from 'react-redux'

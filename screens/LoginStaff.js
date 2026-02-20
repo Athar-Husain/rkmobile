@@ -16,7 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useDispatch, useSelector } from 'react-redux'
 import { useForm, Controller } from 'react-hook-form'
 import Checkbox from 'expo-checkbox'
-import { OtpInput } from 'react-native-otp-entry' // For the smooth UX
+import { OtpInput } from 'react-native-otp-entry'
 
 // Components
 import Header from '../components/Header'
@@ -28,14 +28,20 @@ import { COLORS, icons, images } from '../constants'
 import { useTheme } from '../theme/ThemeProvider'
 
 // Redux
+// import {
+//     staffSigninSendOTP,
+//     staffSigninVerifyOTP,
+//     clearError,
+// } from '../redux/features/Auth/authSlice'
+// import { FCMService } from '../redux/features/Staff/AuthService'
 import {
-    signinSendOTP,
-    signinVerifyOTP,
     clearError,
+    signinStaffSendOTP,
+    signinStaffVerifyOTP,
 } from '../redux/features/Auth/AuthSlice'
 import { FCMService } from '../redux/features/Auth/AuthService'
 
-const Login = () => {
+const LoginStaff = () => {
     const navigation = useNavigation()
     const dispatch = useDispatch()
     const { colors, dark } = useTheme()
@@ -50,7 +56,7 @@ const Login = () => {
     const [tempToken, setTempToken] = useState(null)
     const [userIdentifier, setUserIdentifier] = useState('')
     const [countdown, setCountdown] = useState(0)
-    const [otpCode, setOtpCode] = useState('') // Simplified state
+    const [otpCode, setOtpCode] = useState('')
     const [deviceToken, setDeviceToken] = useState(null)
 
     const {
@@ -84,7 +90,8 @@ const Login = () => {
 
     useEffect(() => {
         if (isLoggedIn) {
-            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] })
+            // navigation.reset({ index: 0, routes: [{ name: 'StaffMainTabs' }] })
+            console.log('logged in Succesfully')
         }
         return () => {
             dispatch(clearError())
@@ -93,7 +100,7 @@ const Login = () => {
 
     const loadRememberedCredentials = async () => {
         try {
-            const remembered = await AsyncStorage.getItem('rememberedUser')
+            const remembered = await AsyncStorage.getItem('rememberedStaff')
             if (remembered) {
                 const { emailOrMobile } = JSON.parse(remembered)
                 setValue('emailOrMobile', emailOrMobile)
@@ -109,7 +116,7 @@ const Login = () => {
         try {
             const id = data.emailOrMobile.trim()
             const result = await dispatch(
-                signinSendOTP({ emailOrMobile: id })
+                signinStaffSendOTP({ emailOrMobile: id })
             ).unwrap()
 
             if (result.success) {
@@ -120,15 +127,15 @@ const Login = () => {
 
                 if (rememberMe) {
                     await AsyncStorage.setItem(
-                        'rememberedUser',
+                        'rememberedStaff',
                         JSON.stringify({ emailOrMobile: id })
                     )
                 } else {
-                    await AsyncStorage.removeItem('rememberedUser')
+                    await AsyncStorage.removeItem('rememberedStaff')
                 }
             }
         } catch (error) {
-            Alert.alert('Login Failed', error || 'User not found')
+            Alert.alert('Login Failed', error || 'Staff not found')
         } finally {
             setLoading(false)
         }
@@ -143,7 +150,7 @@ const Login = () => {
         setLoading(true)
         try {
             await dispatch(
-                signinVerifyOTP({
+                signinStaffVerifyOTP({
                     otp: otpCode,
                     tempToken,
                     deviceToken,
@@ -151,7 +158,7 @@ const Login = () => {
                 })
             ).unwrap()
         } catch (error) {
-            setOtpCode('') // Clear on error
+            setOtpCode('')
         } finally {
             setLoading(false)
         }
@@ -161,7 +168,7 @@ const Login = () => {
 
     const renderStep1 = () => (
         <>
-            <Header title="Sign In" onPress={() => navigation.goBack()} />
+            <Header title="Staff Sign In" onPress={() => navigation.goBack()} />
 
             <View style={styles.logoContainer}>
                 <Image source={images.logo} style={styles.logo} />
@@ -169,7 +176,7 @@ const Login = () => {
                     Welcome Back
                 </Text>
                 <Text style={[styles.subtitle, { color: colors.grayscale700 }]}>
-                    Sign in to your RK Electronics account
+                    Sign in to your Staff account
                 </Text>
             </View>
 
@@ -215,7 +222,9 @@ const Login = () => {
                         </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        onPress={() => navigation.navigate('ForgotPassword')}
+                    // onPress={() =>
+                    //     navigation.navigate('StaffForgotPassword')
+                    // }
                     >
                         <Text style={styles.linkText}>Forgot Password?</Text>
                     </TouchableOpacity>
@@ -234,18 +243,13 @@ const Login = () => {
 
             <View style={styles.footer}>
                 <Text style={{ color: colors.text, fontSize: 15 }}>
-                    Don't have an account?{' '}
+                    Don't have a staff account?{' '}
                 </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-                    <Text style={[styles.linkText, { fontSize: 15 }]}>
-                        Sign Up
-                    </Text>
-                </TouchableOpacity>
                 <TouchableOpacity
-                    onPress={() => navigation.navigate('LoginStaff')}
+                    onPress={() => navigation.navigate('Signup')}
                 >
                     <Text style={[styles.linkText, { fontSize: 15 }]}>
-                        Staff Login
+                        Customer Sign Up
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -372,9 +376,8 @@ const styles = StyleSheet.create({
     linkText: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
     mainBtn: { marginTop: 10, borderRadius: 32, height: 56 },
     footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 40 },
-    // OTP UX
     otpSection: { marginVertical: 30, width: '100%' },
     resendWrapper: { alignItems: 'center', marginBottom: 30 },
 })
 
-export default Login
+export default LoginStaff

@@ -21,6 +21,7 @@ import {
     fetchHistoryCoupons,
     fetchUserSavings,
     claimCouponUser,
+    RESET_COUPON_STATE,
 } from '../redux/features/Coupons/CouponSlice'
 
 const { width } = Dimensions.get('window')
@@ -31,7 +32,7 @@ const CouponsScreen = () => {
     const [modalVisible, setModalVisible] = useState(false)
     const [selectedCoupon, setSelectedCoupon] = useState(null)
 
-    // Redux state
+    // Get specific arrays from Redux
     const {
         discoverCoupons,
         activeCoupons,
@@ -40,38 +41,15 @@ const CouponsScreen = () => {
         isCouponLoading,
     } = useSelector((state) => state.coupon)
 
-    // Fetch coupons based on active tab
+    // Fetch data based on active tab
     useFocusEffect(
         React.useCallback(() => {
-            const fetchData = async () => {
-                if (activeTab === 'discover') {
-                    const res = await dispatch(fetchDiscoverCoupons())
-                    if (res.meta.requestStatus === 'fulfilled') {
-                        // Flatten and sort categorized coupons
-                        const allCoupons = Object.values(
-                            res.payload.categorizedCoupons || {}
-                        ).flat()
-                        const sortedCoupons = allCoupons.sort((a, b) => {
-                            const createdDiff =
-                                new Date(b.createdAt) - new Date(a.createdAt)
-                            if (createdDiff !== 0) return createdDiff
-                            return (
-                                new Date(a.validUntil) - new Date(b.validUntil)
-                            )
-                        })
-                        dispatch({
-                            type: 'coupon/setDiscoverCoupons',
-                            payload: sortedCoupons,
-                        })
-                    }
-                }
-                if (activeTab === 'active') await dispatch(fetchActiveCoupons())
-                if (activeTab === 'history') {
-                    await dispatch(fetchHistoryCoupons())
-                    await dispatch(fetchUserSavings())
-                }
+            if (activeTab === 'discover') dispatch(fetchDiscoverCoupons())
+            if (activeTab === 'active') dispatch(fetchActiveCoupons())
+            if (activeTab === 'history') {
+                dispatch(fetchHistoryCoupons())
+                dispatch(fetchUserSavings())
             }
-            fetchData()
         }, [dispatch, activeTab])
     )
 
@@ -84,6 +62,7 @@ const CouponsScreen = () => {
     }
 
     const renderHeader = () => {
+        // if (activeTab !== 'history' || !userSavings.totalAmount) return null
         return (
             <View style={styles.savingsCard}>
                 <View>
@@ -108,17 +87,9 @@ const CouponsScreen = () => {
     const renderCoupon = ({ item }) => {
         const isDiscover = activeTab === 'discover'
         const isHistory = activeTab === 'history'
+        // Extract master coupon data if it's a UserCoupon object (Active/History tabs)
         const couponData = item.couponId || item
-
-        const now = new Date()
-        const expiryDate = new Date(couponData.validUntil)
-        const daysLeft = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24))
-
-        // Theme color based on urgency
-        const themeColor =
-            daysLeft <= 2 && expiryDate > now
-                ? '#E74C3C'
-                : couponData.color || '#004AAD'
+        const themeColor = couponData.color || '#004AAD'
 
         return (
             <TouchableOpacity
@@ -131,7 +102,7 @@ const CouponsScreen = () => {
                 }}
                 style={[styles.couponCard, isHistory && { opacity: 0.7 }]}
             >
-                {/* Left Discount Panel */}
+                {/* Left Side: Discount Info */}
                 <View
                     style={[
                         styles.leftTab,
@@ -144,43 +115,20 @@ const CouponsScreen = () => {
                             : `₹${couponData.value}`}
                         {'\n'}OFF
                     </Text>
+                    {/* Ticket Cutouts */}
                     <View style={styles.cutoutTop} />
                     <View style={styles.cutoutBottom} />
                 </View>
 
-                {/* Right Content */}
+                {/* Right Side: Content */}
                 <View style={styles.rightContent}>
                     <Text style={styles.couponTitle} numberOfLines={1}>
                         {couponData.title}
                     </Text>
-
                     <Text style={styles.couponSub} numberOfLines={2}>
                         {couponData.description}
                     </Text>
 
-                    {/* Badge */}
-                    {/* {couponData.targeting?.type && (
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>
-                                {couponData.targeting.type === 'REFERRAL'
-                                    ? 'Referral Only'
-                                    : couponData.targeting.segments?.[0] ||
-                                      'All Users'}
-                            </Text>
-                            <Text style={styles.badgeText}>
-                                {couponData?.targeting?.type}
-                            </Text>
-                        </View>
-                    )} */}
-
-                    {/* Expiry */}
-                    <Text style={styles.couponExpiry}>
-                        {expiryDate > now
-                            ? `Expires in ${daysLeft} day${daysLeft > 1 ? 's' : ''}`
-                            : 'Expired'}
-                    </Text>
-
-                    {/* Buttons or Status */}
                     {isDiscover ? (
                         <TouchableOpacity
                             style={[
@@ -229,7 +177,7 @@ const CouponsScreen = () => {
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.headerTitle}>RK Rewards</Text>
-                {renderHeader()}
+                <View>{renderHeader()}</View>
                 <View style={styles.tabBar}>
                     {['discover', 'active', 'history'].map((tab) => (
                         <TouchableOpacity
@@ -267,7 +215,8 @@ const CouponsScreen = () => {
                               : historyCoupons
                     }
                     renderItem={renderCoupon}
-                    keyExtractor={(item) => item._id || item.couponId?._id}
+                    keyExtractor={(item) => item._id}
+                    // ListHeaderComponent={renderHeader}
                     contentContainerStyle={styles.listContainer}
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
@@ -376,7 +325,7 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         flexDirection: 'row',
         marginBottom: 16,
-        height: 130,
+        height: 115,
         elevation: 2,
         overflow: 'hidden',
     },
@@ -413,16 +362,6 @@ const styles = StyleSheet.create({
     rightContent: { flex: 1, padding: 15, justifyContent: 'center' },
     couponTitle: { fontSize: 16, fontWeight: '700', color: '#2C3E50' },
     couponSub: { fontSize: 12, color: '#7F8C8D', marginVertical: 4 },
-    couponExpiry: { fontSize: 11, fontWeight: '600', color: '#E67E22' },
-    badge: {
-        backgroundColor: '#004AAD',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 6,
-        alignSelf: 'flex-start',
-        marginVertical: 4,
-    },
-    badgeText: { color: '#FFF', fontSize: 10, fontWeight: '700' },
     claimBtn: {
         paddingVertical: 8,
         paddingHorizontal: 15,

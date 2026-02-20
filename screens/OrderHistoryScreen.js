@@ -1,215 +1,275 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import {
     View,
     Text,
     FlatList,
     StyleSheet,
     TouchableOpacity,
+    RefreshControl,
+    ActivityIndicator,
+    Modal,
+    ScrollView,
+    Dimensions,
+    TextInput,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native'
+import { useDispatch, useSelector } from 'react-redux'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
+import moment from 'moment'
+// import {
+//     addRating,
+//     getMyPurchases,
+// } from '../redux/features/Purchases/PurchaseSlice.js'
+import OrderDetailsModal from '../containers/Purchases/OrderDetailsModal'
+import { getMyPurchases } from '../redux/features/Purchases/PurchaseSlice'
 
+const { height, width } = Dimensions.get('window')
+
+/* =============================================================================
+   MAIN COMPONENT: OrderHistoryScreen
+   ============================================================================= */
 const OrderHistoryScreen = () => {
-    const orders = [
-        {
-            id: 'INV-9901',
-            item: 'Samsung Galaxy S24 Ultra',
-            date: '24 Jan 2026',
-            price: '₹74,999',
-            status: 'Delivered',
-            icon: 'cellphone-check',
-        },
-        {
-            id: 'INV-8852',
-            item: 'LG OLED TV 55"',
-            date: '12 Dec 2025',
-            price: '₹1,20,000',
-            status: 'Servicing',
-            icon: 'television-shimmer',
-        },
-    ]
+    const dispatch = useDispatch()
+    const { mypurchases, isPurchaseLoading } = useSelector(
+        (state) => state.purchase
+    )
 
-    const renderOrderItem = ({ item }) => (
-        <View style={styles.card}>
-            <View style={styles.cardHeader}>
-                <View style={styles.iconContainer}>
-                    <MaterialCommunityIcons
-                        name={item.icon}
-                        size={24}
-                        color="#004AAD"
-                    />
-                </View>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.orderId}>{item.id}</Text>
-                    <Text style={styles.date}>{item.date}</Text>
-                </View>
-                <View
-                    style={[
-                        styles.badge,
-                        {
-                            backgroundColor:
-                                item.status === 'Delivered'
-                                    ? '#E8F5E9'
-                                    : '#FFF3E0',
-                        },
-                    ]}
-                >
-                    <Text
+    const [selectedOrder, setSelectedOrder] = useState(null)
+    const [modalVisible, setModalVisible] = useState(false)
+
+    useEffect(() => {
+        dispatch(getMyPurchases())
+    }, [dispatch])
+
+    const handleViewDetails = (order) => {
+        setSelectedOrder(order)
+        setModalVisible(true)
+    }
+
+    const getDeliveryInfo = (status) => {
+        const map = {
+            PENDING: { color: '#7C7C7C', label: 'Processing' },
+            SCHEDULED: { color: '#004AAD', label: 'Scheduled' },
+            DELIVERED: { color: '#2E7D32', label: 'Delivered' },
+            INSTALLED: { color: '#6200EE', label: 'Installed' },
+        }
+        return map[status] || map['PENDING']
+    }
+
+    const renderOrderItem = ({ item }) => {
+        const delivery = getDeliveryInfo(item.delivery?.status)
+        const isCancelled = item.status === 'CANCELLED'
+
+        return (
+            <View style={[styles.card, isCancelled && { opacity: 0.7 }]}>
+                <View style={styles.cardHeader}>
+                    <View style={styles.iconContainer}>
+                        <MaterialCommunityIcons
+                            name={
+                                item.delivery?.type === 'HOME_DELIVERY'
+                                    ? 'truck-fast'
+                                    : 'store-check'
+                            }
+                            size={22}
+                            color="#004AAD"
+                        />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.orderId}>{item.invoiceNumber}</Text>
+                        <Text style={styles.date}>
+                            {moment(item.createdAt).format(
+                                'DD MMM YYYY, hh:mm A'
+                            )}
+                        </Text>
+                    </View>
+                    <View
                         style={[
-                            styles.badgeText,
-                            {
-                                color:
-                                    item.status === 'Delivered'
-                                        ? '#2E7D32'
-                                        : '#EF6C00',
-                            },
+                            styles.statusBadge,
+                            { backgroundColor: delivery.color + '15' },
                         ]}
                     >
-                        {item.status}
-                    </Text>
+                        <Text
+                            style={[
+                                styles.statusText,
+                                { color: delivery.color },
+                            ]}
+                        >
+                            {isCancelled ? 'CANCELLED' : delivery.label}
+                        </Text>
+                    </View>
+                </View>
+
+                <View style={styles.divider} />
+
+                <View style={styles.cardBody}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.itemName} numberOfLines={1}>
+                            {item.items[0]?.name}
+                            {item.items.length > 1 && (
+                                <Text style={styles.moreCount}>
+                                    {' '}
+                                    +{item.items.length - 1} more
+                                </Text>
+                            )}
+                        </Text>
+                        <Text style={styles.storeName}>
+                            📍 {item.storeId?.name || 'Authorized Store'}
+                        </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={styles.price}>
+                            ₹{item.finalAmount?.toLocaleString('en-IN')}
+                        </Text>
+                        {item.discount > 0 && (
+                            <Text style={styles.savings}>
+                                Saved ₹{item.discount.toLocaleString('en-IN')}
+                            </Text>
+                        )}
+                    </View>
+                </View>
+
+                <View style={styles.footer}>
+                    <TouchableOpacity
+                        style={styles.secondaryBtn}
+                        onPress={() => handleViewDetails(item)}
+                    >
+                        <Text style={styles.secondaryBtnText}>
+                            View Details
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.primaryBtn}>
+                        <MaterialCommunityIcons
+                            name="file-download-outline"
+                            size={16}
+                            color="#FFF"
+                        />
+                        <Text style={styles.primaryBtnText}>Invoice</Text>
+                    </TouchableOpacity>
                 </View>
             </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.cardBody}>
-                <Text style={styles.itemName}>{item.item}</Text>
-                <Text style={styles.price}>{item.price}</Text>
-            </View>
-
-            <TouchableOpacity style={styles.actionButton} activeOpacity={0.7}>
-                <MaterialCommunityIcons
-                    name="file-download-outline"
-                    size={18}
-                    color="#004AAD"
-                />
-                <Text style={styles.actionText}>Download Invoice</Text>
-            </TouchableOpacity>
-        </View>
-    )
+        )
+    }
 
     return (
         <View style={styles.container}>
             <View style={styles.headerSection}>
                 <Text style={styles.headerTitle}>Order History</Text>
                 <Text style={styles.subTitle}>
-                    View and manage your purchases
+                    Manage invoices & service requests
                 </Text>
             </View>
 
             <FlatList
-                data={orders}
+                data={mypurchases}
                 renderItem={renderOrderItem}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={{ paddingBottom: 20 }}
-                showsVerticalScrollIndicator={false}
+                keyExtractor={(item) => item._id}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isPurchaseLoading}
+                        onRefresh={() => dispatch(getMyPurchases())}
+                    />
+                }
+                contentContainerStyle={{ paddingBottom: 30 }}
+                ListEmptyComponent={
+                    !isPurchaseLoading && (
+                        <View style={styles.emptyState}>
+                            <MaterialCommunityIcons
+                                name="receipt"
+                                size={80}
+                                color="#E0E0E0"
+                            />
+                            <Text style={styles.emptyStateText}>
+                                No purchases found
+                            </Text>
+                        </View>
+                    )
+                }
+            />
+
+            <OrderDetailsModal
+                visible={modalVisible}
+                order={selectedOrder}
+                onClose={() => setModalVisible(false)}
             />
         </View>
     )
 }
 
+/* =============================================================================
+   STYLES (Merged)
+   ============================================================================= */
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8F9FB',
-        paddingHorizontal: 20,
-    },
-    headerSection: {
-        marginTop: 40,
-        marginBottom: 20,
-    },
-    headerTitle: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#1A1A1A',
-    },
-    subTitle: {
-        fontSize: 14,
-        color: '#7C7C7C',
-        marginTop: 4,
-    },
+    // Screen Styles
+    container: { flex: 1, backgroundColor: '#F8FAFC', paddingHorizontal: 16 },
+    headerSection: { marginTop: 60, marginBottom: 20 },
+    headerTitle: { fontSize: 28, fontWeight: '800', color: '#1A1C1E' },
+    subTitle: { fontSize: 14, color: '#64748B', marginTop: 4 },
     card: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
+        backgroundColor: '#FFF',
+        borderRadius: 20,
         padding: 16,
         marginBottom: 16,
-        // Shadow for iOS
+        elevation: 3,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.05,
         shadowRadius: 10,
-        // Elevation for Android
-        elevation: 3,
     },
-    cardHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
+    cardHeader: { flexDirection: 'row', alignItems: 'center' },
     iconContainer: {
-        width: 45,
-        height: 45,
+        width: 42,
+        height: 42,
         borderRadius: 12,
-        backgroundColor: '#F0F5FF',
+        backgroundColor: '#F0F7FF',
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
     },
-    orderId: {
-        fontSize: 14,
-        fontWeight: '700',
-        color: '#1A1A1A',
-    },
-    date: {
-        fontSize: 12,
-        color: '#9E9E9E',
-        marginTop: 2,
-    },
-    badge: {
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 8,
-    },
-    badgeText: {
-        fontSize: 11,
-        fontWeight: 'bold',
-    },
-    divider: {
-        height: 1,
-        backgroundColor: '#F0F0F0',
-        marginVertical: 15,
-    },
+    orderId: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
+    date: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
+    statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+    statusText: { fontSize: 10, fontWeight: '800' },
+    divider: { height: 1, backgroundColor: '#F1F5F9', marginVertical: 14 },
     cardBody: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 15,
+        marginBottom: 16,
     },
-    itemName: {
-        fontSize: 16,
+    itemName: { fontSize: 16, fontWeight: '600', color: '#334155' },
+    moreCount: { color: '#004AAD', fontSize: 13 },
+    storeName: { fontSize: 12, color: '#64748B', marginTop: 4 },
+    price: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
+    savings: {
+        fontSize: 11,
+        color: '#16A34A',
         fontWeight: '600',
-        color: '#444',
-        flex: 1,
+        marginTop: 2,
     },
-    price: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#004AAD',
-    },
-    actionButton: {
+    footer: { flexDirection: 'row', gap: 10 },
+    primaryBtn: {
+        flex: 1.5,
+        backgroundColor: '#004AAD',
         flexDirection: 'row',
-        alignItems: 'center',
+        height: 44,
+        borderRadius: 12,
         justifyContent: 'center',
-        paddingVertical: 10,
-        borderRadius: 10,
-        backgroundColor: '#F0F5FF',
+        alignItems: 'center',
+        gap: 6,
+    },
+    primaryBtnText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
+    secondaryBtn: {
+        flex: 1,
+        backgroundColor: '#FFF',
+        height: 44,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#D0E0FF',
+        borderColor: '#E2E8F0',
     },
-    actionText: {
-        fontSize: 13,
-        fontWeight: '600',
-        color: '#004AAD',
-        marginLeft: 8,
-    },
+    secondaryBtnText: { color: '#475569', fontSize: 14, fontWeight: '600' },
+    emptyState: { alignItems: 'center', marginTop: 100 },
+    emptyStateText: { marginTop: 16, color: '#94A3B8', fontSize: 16 },
 })
 
 export default OrderHistoryScreen

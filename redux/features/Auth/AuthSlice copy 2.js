@@ -1,11 +1,8 @@
-// redux/features/Auth/AuthSlice.js
+// redux/features/Auth/AuthSlice
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { showMessage } from 'react-native-flash-message'
-import AuthService, { FCMService } from './AuthService'
-import StaffService from '../Staff/StaffService'
+import AuthService from './AuthService'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { Platform } from 'react-native'
-import { TokenManager } from '../../../utils/tokenManager'
 
 /* -------------------- CONSTANTS -------------------- */
 const AUTH_STORAGE_KEYS = {
@@ -37,7 +34,6 @@ const clearAuthStorage = async () => {
             'fcm_token',
             'deviceId',
         ])
-        await TokenManager.clear()
     } catch (error) {
         console.error('Error clearing auth storage:', error)
     }
@@ -46,8 +42,10 @@ const clearAuthStorage = async () => {
 // Safe showMessage wrapper
 export const safeShowMessage = (config) => {
     try {
+        // Ensure message is a string and not undefined
         const message = config.message || 'Operation completed'
         const type = config.type || 'info'
+
         if (typeof message === 'string' && message.trim()) {
             showMessage({
                 message: message,
@@ -64,55 +62,77 @@ export const safeShowMessage = (config) => {
 
 /* -------------------- ASYNC THUNKS -------------------- */
 
-// -------------------- APP INITIALIZATION --------------------
 export const initializeApplication = createAsyncThunk(
     'auth/initializeApplication',
     async (_, thunkAPI) => {
         try {
+            // Get device ID first
             const deviceId =
                 (await AsyncStorage.getItem('deviceId')) ||
                 `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
             if (!(await AsyncStorage.getItem('deviceId'))) {
                 await AsyncStorage.setItem('deviceId', deviceId)
             }
 
+            // Check onboarding status
             const onboardingCompleted = await AsyncStorage.getItem(
-                AUTH_STORAGE_KEYS.ONBOARDING
+                'onboarding_completed'
             )
             const hasCompletedOnboarding = onboardingCompleted === 'true'
 
-            let userData = null
-            let userType = null
-            const token = await TokenManager.getToken()
+            // Check if user is authenticated
+            const isAuthenticated = await AuthService.isAuthenticated()
 
-            if (token) {
-                // Check if customer
-                if (await AuthService.isAuthenticated()) {
+            let userData = null
+            let fcmToken = null
+
+            if (isAuthenticated) {
+                try {
+                    // Try to get fresh user data from API
                     const statusResponse = await AuthService.getLoginStatus()
                     userData = statusResponse.user
-                    userType = 'customer'
+
+                    // Get stored user data as fallback
+                    if (!userData) {
+                        userData = await AuthService.getStoredUserData()
+                    }
+
+                    // Register/update FCM token in background (don't await)
+                    AuthService.updateFCMToken().catch((err) =>
+                        console.log(
+                            'FCM registration during init failed:',
+                            err.message
+                        )
+                    )
+                } catch (apiError) {
+                    console.log('API initialization error:', apiError.message)
+
+                    // Use stored data if API fails
+                    userData = await AuthService.getStoredUserData()
+
+                    // If stored data is invalid, clear everything
+                    if (!userData) {
+                        await clearAuthStorage()
+                    }
                 }
-                // Check if staff
-                else if (await StaffService.getStaffLoginStatus()) {
-                    const statusResponse =
-                        await StaffService.getStaffLoginStatus()
-                    userData = statusResponse.user
-                    userType = 'staff'
-                } else {
-                    await clearAuthStorage()
-                }
+            } else {
+                // Clear any stale data
+                await clearAuthStorage()
             }
 
             return {
-                deviceId,
-                userData,
-                userType,
-                isLoggedIn: !!userData,
                 hasCompletedOnboarding,
+                isLoggedIn: isAuthenticated && !!userData,
+                userData,
+                deviceId,
             }
         } catch (error) {
             console.error('Failed to initialize app state:', error)
+
+            // Clear invalid data
             await clearAuthStorage()
+
             return thunkAPI.rejectWithValue({
                 message:
                     'Failed to initialize application. Please restart the app.',
@@ -122,7 +142,6 @@ export const initializeApplication = createAsyncThunk(
     }
 )
 
-// -------------------- CUSTOMER THUNKS --------------------
 export const signupSendOTP = createAsyncThunk(
     'auth/signupSendOTP',
     async (data, thunkAPI) => {
@@ -140,11 +159,19 @@ export const signupVerifyOTP = createAsyncThunk(
     async (data, thunkAPI) => {
         try {
             const response = await AuthService.signupVerifyOTP(data)
-            if (response.user) await saveUserToStorage(response.user)
+
+            // Save user data
+            if (response.user) {
+                await saveUserToStorage(response.user)
+            }
+
+            // Show success message
             safeShowMessage({
                 message: 'Account created successfully!',
                 type: 'success',
+                duration: 3000,
             })
+
             return response
         } catch (e) {
             return thunkAPI.rejectWithValue(errorMessage(e))
@@ -169,38 +196,19 @@ export const signinVerifyOTP = createAsyncThunk(
     async (data, thunkAPI) => {
         try {
             const response = await AuthService.signinVerifyOTP(data)
-            if (response.user) await saveUserToStorage(response.user)
-            safeShowMessage({ message: 'Login successful!', type: 'success' })
-            return response
-        } catch (e) {
-            return thunkAPI.rejectWithValue(errorMessage(e))
-        }
-    }
-)
 
-// -------------------- STAFF THUNKS --------------------
-export const signinStaffSendOTP = createAsyncThunk(
-    'auth/signinStaffSendOTP',
-    async (data, thunkAPI) => {
-        try {
-            const response = await StaffService.signinSendOTP(data)
-            return response
-        } catch (e) {
-            return thunkAPI.rejectWithValue(errorMessage(e))
-        }
-    }
-)
+            // Save user data
+            if (response.user) {
+                await saveUserToStorage(response.user)
+            }
 
-export const signinStaffVerifyOTP = createAsyncThunk(
-    'auth/signinStaffVerifyOTP',
-    async (data, thunkAPI) => {
-        try {
-            const response = await StaffService.signinVerifyOTP(data)
-            if (response.user) await saveUserToStorage(response.user)
+            // Show success message
             safeShowMessage({
-                message: 'Staff login successful!',
+                message: 'Login successful!',
                 type: 'success',
+                duration: 2000,
             })
+
             return response
         } catch (e) {
             return thunkAPI.rejectWithValue(errorMessage(e))
@@ -208,7 +216,7 @@ export const signinStaffVerifyOTP = createAsyncThunk(
     }
 )
 
-// -------------------- PASSWORD RESET --------------------
+// ADD THESE MISSING THUNKS
 export const forgotPassword = createAsyncThunk(
     'auth/forgotPassword',
     async (data, thunkAPI) => {
@@ -231,55 +239,43 @@ export const resetPassword = createAsyncThunk(
     }
 )
 
-export const staffForgotPassword = createAsyncThunk(
-    'auth/staffForgotPassword',
-    async (data, thunkAPI) => {
-        try {
-            return await StaffService.staffForgotPassword(data)
-        } catch (e) {
-            return thunkAPI.rejectWithValue(errorMessage(e))
-        }
-    }
-)
-
-export const staffResetPassword = createAsyncThunk(
-    'auth/staffResetPassword',
-    async (data, thunkAPI) => {
-        try {
-            return await StaffService.staffResetPassword(data)
-        } catch (e) {
-            return thunkAPI.rejectWithValue(errorMessage(e))
-        }
-    }
-)
-
-// -------------------- LOGOUT --------------------
 export const logout = createAsyncThunk('auth/logout', async (_, thunkAPI) => {
     try {
-        const state = thunkAPI.getState()
-        if (state.auth.user.userType === 'staff') {
-            await StaffService.staffLogout()
-        } else {
-            await AuthService.logout()
-        }
-        safeShowMessage({ message: 'Logged out successfully', type: 'info' })
+        await AuthService.logout()
+
+        // Show logout message
+        safeShowMessage({
+            message: 'Logged out successfully',
+            type: 'info',
+            duration: 2000,
+        })
+
         return true
     } catch (e) {
+        // Even if API logout fails, clear local state
         await clearAuthStorage()
         return thunkAPI.rejectWithValue(errorMessage(e))
     }
 })
 
-// -------------------- PROFILE --------------------
+export const refreshFCMToken = createAsyncThunk(
+    'auth/refreshFCMToken',
+    async (_, thunkAPI) => {
+        try {
+            const token = await AuthService.updateFCMToken()
+            return token
+        } catch (e) {
+            console.log('FCM Token Refresh Error:', e.message)
+            return thunkAPI.rejectWithValue(null)
+        }
+    }
+)
+
 export const getProfile = createAsyncThunk(
     'auth/getProfile',
     async (_, thunkAPI) => {
         try {
-            const state = thunkAPI.getState()
-            const user =
-                state.auth.userType === 'staff'
-                    ? await StaffService.getStaffProfile()
-                    : await AuthService.getProfile()
+            const user = await AuthService.getProfile()
             await saveUserToStorage(user)
             return user
         } catch (e) {
@@ -292,17 +288,19 @@ export const updateProfile = createAsyncThunk(
     'auth/updateProfile',
     async (data, thunkAPI) => {
         try {
+            const response = await AuthService.updateProfile(data)
+
+            // Update local user data
             const state = thunkAPI.getState()
-            const response =
-                state.auth.userType === 'staff'
-                    ? await StaffService.updateStaffProfile(data)
-                    : await AuthService.updateProfile(data)
             const updatedUser = { ...state.auth.user, ...response.user }
             await saveUserToStorage(updatedUser)
+
             safeShowMessage({
                 message: 'Profile updated successfully',
                 type: 'success',
+                duration: 2000,
             })
+
             return response
         } catch (e) {
             return thunkAPI.rejectWithValue(errorMessage(e))
@@ -310,25 +308,17 @@ export const updateProfile = createAsyncThunk(
     }
 )
 
-// -------------------- REFRESH FCM TOKEN --------------------
-export const refreshFCMToken = createAsyncThunk(
-    'auth/refreshFCMToken',
-    async (_, thunkAPI) => {
+export const validateReferralCode = createAsyncThunk(
+    'auth/validateReferralCode',
+    async (code, thunkAPI) => {
         try {
-            const state = thunkAPI.getState()
-            const token =
-                state.auth.userType === 'staff'
-                    ? await StaffService.registerStaffFCMToken()
-                    : await AuthService.updateFCMToken()
-            return token
+            return await AuthService.validateReferralCode(code)
         } catch (e) {
-            console.log('FCM Token Refresh Error:', e.message)
-            return thunkAPI.rejectWithValue(null)
+            return thunkAPI.rejectWithValue(errorMessage(e))
         }
     }
 )
 
-// -------------------- ONBOARDING --------------------
 export const markOnboardingComplete = createAsyncThunk(
     'auth/markOnboardingComplete',
     async (_, thunkAPI) => {
@@ -355,48 +345,76 @@ export const resetOnboarding = createAsyncThunk(
     }
 )
 
-// -------------------- SLICE --------------------
+export const refreshToken = createAsyncThunk(
+    'auth/refreshToken',
+    async (_, thunkAPI) => {
+        try {
+            return await AuthService.refreshToken()
+        } catch (e) {
+            // If refresh fails, log user out
+            thunkAPI.dispatch(logout())
+            return thunkAPI.rejectWithValue(errorMessage(e))
+        }
+    }
+)
+
+/* -------------------- SLICE -------------------- */
 const authSlice = createSlice({
     name: 'auth',
     initialState: {
+        // User data
         user: null,
-        userType: null, // 'customer' | 'staff'
         tempToken: null,
+
+        // Auth status
         isLoggedIn: false,
         isLoading: false,
         isInitializing: true,
         isAppReady: false,
+
+        // Device info
         deviceId: null,
+
+        // App state
         hasCompletedOnboarding: null,
+
+        // Error handling
         error: null,
     },
     reducers: {
         setTempToken: (state, action) => {
             state.tempToken = action.payload
         },
+
         resetAuthState: (state) => {
             state.user = null
-            state.userType = null
             state.tempToken = null
             state.isLoggedIn = false
             state.isLoading = false
             state.error = null
             state.deviceId = null
         },
+
         setUser: (state, action) => {
             state.user = action.payload
             state.isLoggedIn = !!action.payload
         },
+
         clearError: (state) => {
             state.error = null
         },
+
         updateUserField: (state, action) => {
             const { field, value } = action.payload
-            if (state.user) state.user[field] = value
+            if (state.user) {
+                state.user[field] = value
+            }
         },
+
         setLoading: (state, action) => {
             state.isLoading = action.payload
         },
+
         setAppReady: (state) => {
             state.isAppReady = true
             state.isInitializing = false
@@ -404,7 +422,7 @@ const authSlice = createSlice({
     },
     extraReducers: (builder) => {
         builder
-            // -------------------- INITIALIZE APPLICATION --------------------
+            /* ---------- INITIALIZE APPLICATION ---------- */
             .addCase(initializeApplication.pending, (state) => {
                 state.isInitializing = true
                 state.isAppReady = false
@@ -418,7 +436,6 @@ const authSlice = createSlice({
                     action.payload.hasCompletedOnboarding
                 state.isLoggedIn = action.payload.isLoggedIn
                 state.user = action.payload.userData
-                state.userType = action.payload.userType
                 state.deviceId = action.payload.deviceId
                 state.error = null
             })
@@ -427,103 +444,103 @@ const authSlice = createSlice({
                 state.isAppReady = true
                 state.isLoggedIn = false
                 state.user = null
-                state.userType = null
                 state.isLoading = false
                 state.error = action.payload?.message || 'Initialization failed'
             })
 
-            // -------------------- OTP & LOGIN --------------------
+            /* ---------- SIGNUP ---------- */
             .addCase(signupSendOTP.fulfilled, (state, action) => {
                 state.isLoading = false
                 state.tempToken = action.payload.tempToken
                 state.error = null
             })
+
             .addCase(signupVerifyOTP.fulfilled, (state, action) => {
                 state.isLoading = false
                 state.isLoggedIn = true
                 state.user = action.payload.user
-                state.userType = 'customer'
                 state.tempToken = null
                 state.error = null
             })
+
+            /* ---------- SIGNIN ---------- */
             .addCase(signinSendOTP.fulfilled, (state, action) => {
                 state.isLoading = false
                 state.tempToken = action.payload.tempToken
                 state.error = null
             })
+
+            /* Inside extraReducers builder */
+            .addCase(signinSendOTP.rejected, (state, action) => {
+                state.isLoading = false // Force loading off
+                state.error = action.payload
+            })
+
             .addCase(signinVerifyOTP.fulfilled, (state, action) => {
                 state.isLoading = false
                 state.isLoggedIn = true
                 state.user = action.payload.user
-                state.userType = 'customer'
-                state.tempToken = null
-                state.error = null
-            })
-            .addCase(signinStaffSendOTP.fulfilled, (state, action) => {
-                state.isLoading = false
-                state.tempToken = action.payload.tempToken
-                state.error = null
-            })
-            .addCase(signinStaffVerifyOTP.fulfilled, (state, action) => {
-                state.isLoading = false
-                state.isLoggedIn = true
-                state.user = action.payload.user
-                state.userType = 'staff'
                 state.tempToken = null
                 state.error = null
             })
 
-            // -------------------- PASSWORD RESET --------------------
-            .addCase(forgotPassword.fulfilled, (state) => {
+            /* ---------- PASSWORD RESET ---------- */
+            .addCase(forgotPassword.fulfilled, (state, action) => {
                 state.isLoading = false
                 state.error = null
             })
+
             .addCase(resetPassword.fulfilled, (state) => {
                 state.isLoading = false
                 state.error = null
             })
-            .addCase(staffForgotPassword.fulfilled, (state) => {
-                state.isLoading = false
-                state.error = null
-            })
-            .addCase(staffResetPassword.fulfilled, (state) => {
-                state.isLoading = false
-                state.error = null
-            })
 
-            // -------------------- LOGOUT --------------------
+            /* ---------- LOGOUT ---------- */
+            // .addCase(logout.fulfilled, (state) => {
+            //     state.user = null
+            //     state.isLoggedIn = false
+            //     state.tempToken = null
+            //     state.error = null
+            // })
             .addCase(logout.fulfilled, (state) => {
                 state.user = null
-                state.userType = null
                 state.isLoggedIn = false
                 state.tempToken = null
                 state.error = null
-                state.isLoading = false
+                state.isLoading = false // 👈 Add this to kill the "Sending OTP" spinner
             })
+            // .addCase(signinVerifyStaffOTP.fulfilled, (state, action) => {
+            //     state.isLoading = false
+            //     state.isLoggedIn = true
+            //     state.user = action.payload.user
+            // })
 
-            // -------------------- ONBOARDING --------------------
+            /* ---------- ONBOARDING ---------- */
             .addCase(markOnboardingComplete.fulfilled, (state) => {
                 state.hasCompletedOnboarding = true
                 state.isLoading = false
             })
+
             .addCase(resetOnboarding.fulfilled, (state) => {
                 state.hasCompletedOnboarding = false
                 state.isLoading = false
             })
 
-            // -------------------- PENDING MATCHER --------------------
+            /* ---------- PENDING MATCHER ---------- */
             .addMatcher(
                 (action) =>
                     action.type.startsWith('auth/') &&
                     action.type.endsWith('/pending'),
                 (state, action) => {
-                    if (!action.type.includes('initializeApplication'))
+                    // Don't set loading for initialization
+                    if (!action.type.includes('initializeApplication')) {
                         state.isLoading = true
+                    }
                     state.error = null
                 }
             )
 
-            // -------------------- REJECTED MATCHER --------------------
+            /* ---------- REJECTED MATCHER ---------- */
             .addMatcher(
                 (action) =>
                     action.type.startsWith('auth/') &&
@@ -531,6 +548,8 @@ const authSlice = createSlice({
                 (state, action) => {
                     state.isLoading = false
                     state.error = action.payload
+
+                    // Don't show message for silent errors or initialization
                     if (
                         action.payload &&
                         !action.type.includes('refreshFCMToken') &&
@@ -550,7 +569,6 @@ const authSlice = createSlice({
 /* -------------------- SELECTORS -------------------- */
 export const selectAuth = (state) => state.auth
 export const selectUser = (state) => state.auth.user
-export const selectUserType = (state) => state.auth.userType
 export const selectIsLoggedIn = (state) => state.auth.isLoggedIn
 export const selectIsLoading = (state) => state.auth.isLoading
 export const selectIsInitializing = (state) => state.auth.isInitializing

@@ -16,6 +16,7 @@ import {
 import OtpVerify from '../screens/OtpVerify'
 import FinalSignupScreen from '../screens/FinalSignupScreen'
 import VerifyOTPScreen from '../screens/VerifyOTPScreen'
+import LoginStaff from '../screens/LoginStaff'
 
 const Stack = createNativeStackNavigator()
 
@@ -23,6 +24,7 @@ const AuthStack = () => (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Welcome" component={Welcome} />
         <Stack.Screen name="Login" component={Login} />
+        <Stack.Screen name="LoginStaff" component={LoginStaff} />
         <Stack.Screen name="Signup" component={Signup} />
         {/* <Stack.Screen name="OTPVerification" component={OTPVerification} /> */}
         <Stack.Screen name="VerifyOTP" component={OtpVerify} />
