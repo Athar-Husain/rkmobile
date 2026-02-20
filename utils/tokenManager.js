@@ -1,3 +1,4 @@
+// utils/tokenManager.js
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 const TOKEN_KEY = 'auth_token'

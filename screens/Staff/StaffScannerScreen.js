@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
     View,
     Text,
@@ -7,14 +7,14 @@ import {
     Alert,
     Modal,
     TextInput,
+    ActivityIndicator,
 } from 'react-native'
 import {
     Camera,
-    useCameraDevices,
-    useFrameProcessor,
+    useCameraDevice,
+    useCodeScanner,
 } from 'react-native-vision-camera'
-import { barcodeScanner } from 'vision-camera-code-scanner' // Optional high-speed scanner
-import { useDispatch, useSelector } from 'react-redux'
+import { useDispatch } from 'react-redux'
 import {
     validateForStaffAction,
     redeemCouponStaff,
@@ -22,8 +22,9 @@ import {
 
 const StaffScannerScreen = () => {
     const dispatch = useDispatch()
-    const devices = useCameraDevices()
-    const device = devices.back
+
+    // In V4, useCameraDevice('back') is the standard way to get the camera
+    const device = useCameraDevice('back')
 
     const [hasPermission, setHasPermission] = useState(false)
     const [scannedCode, setScannedCode] = useState(null)
@@ -34,30 +35,46 @@ const StaffScannerScreen = () => {
     const [couponData, setCouponData] = useState(null)
     const [orderAmount, setOrderAmount] = useState('')
 
+    // Request Permissions
     useEffect(() => {
         ;(async () => {
             const status = await Camera.requestCameraPermission()
-            setHasPermission(status === 'authorized')
+            setHasPermission(status === 'granted')
         })()
     }, [])
 
-    // Simulated scanner logic (Simplified for clarity)
-    const onCodeScanned = (code) => {
-        if (isProcessing || confirmModal) return
-        setIsProcessing(true)
+    // 1. Logic to handle the scanned code
+    const onCodeScanned = useCallback(
+        (code) => {
+            if (isProcessing || confirmModal) return
 
-        // 1. Validate the code scanned from the QR
-        dispatch(validateForStaffAction({ code })).then((res) => {
-            if (res.meta.requestStatus === 'fulfilled') {
-                setCouponData(res.payload) // Set data returned by validateForStaff
-                setScannedCode(code)
-                setConfirmModal(true)
-            } else {
-                Alert.alert('Error', res.payload || 'Invalid Coupon')
-                setIsProcessing(false)
+            setIsProcessing(true)
+
+            // Validate the code with your Redux action
+            dispatch(validateForStaffAction({ code })).then((res) => {
+                if (res.meta.requestStatus === 'fulfilled') {
+                    setCouponData(res.payload)
+                    setScannedCode(code)
+                    setConfirmModal(true)
+                } else {
+                    Alert.alert('Error', res.payload || 'Invalid Coupon', [
+                        { text: 'OK', onPress: () => setIsProcessing(false) },
+                    ])
+                }
+            })
+        },
+        [isProcessing, confirmModal, dispatch]
+    )
+
+    // 2. Built-in Code Scanner Configuration (Vision Camera V4)
+    const codeScanner = useCodeScanner({
+        codeTypes: ['qr', 'ean-13', 'code-128'], // Add types you need
+        onCodeScanned: (codes) => {
+            if (codes.length > 0 && codes[0].value) {
+                onCodeScanned(codes[0].value)
             }
-        })
-    }
+        },
+    })
 
     const handleFinalRedeem = () => {
         if (!orderAmount || isNaN(orderAmount)) {
@@ -67,7 +84,7 @@ const StaffScannerScreen = () => {
         const payload = {
             uniqueCode: scannedCode,
             orderAmount: parseFloat(orderAmount),
-            storeId: 'YOUR_STORE_ID', // Usually from staff profile/auth
+            storeId: 'YOUR_STORE_ID',
         }
 
         dispatch(redeemCouponStaff(payload)).then((res) => {
@@ -80,31 +97,51 @@ const StaffScannerScreen = () => {
                     'Success',
                     'Discount Applied and Coupon Marked as Used!'
                 )
+            } else {
+                Alert.alert(
+                    'Redemption Failed',
+                    res.payload || 'Something went wrong'
+                )
             }
         })
     }
 
-    if (!device || !hasPermission)
+    if (!hasPermission) {
         return (
             <View style={styles.center}>
-                <Text>Initializing Camera...</Text>
+                <Text>No Camera Permission</Text>
             </View>
         )
+    }
+
+    if (!device) {
+        return (
+            <View style={styles.center}>
+                <Text>Camera Device Not Found</Text>
+            </View>
+        )
+    }
 
     return (
         <View style={styles.container}>
             <Camera
                 style={StyleSheet.absoluteFill}
                 device={device}
-                isActive={!confirmModal}
-                // Vision camera frame processor logic goes here in a real app
+                isActive={!confirmModal && !isProcessing} // Stop camera when processing
+                codeScanner={codeScanner} // Native scanning logic
             />
 
             {/* Overlay UI */}
             <View style={styles.overlay}>
-                <View style={styles.scannerFrame} />
+                <View style={styles.scannerFrame}>
+                    {isProcessing && !confirmModal && (
+                        <ActivityIndicator size="large" color="#004AAD" />
+                    )}
+                </View>
                 <Text style={styles.hintText}>
-                    Align QR code within the frame
+                    {isProcessing
+                        ? 'Validating...'
+                        : 'Align QR code within the frame'}
                 </Text>
             </View>
 
@@ -116,16 +153,18 @@ const StaffScannerScreen = () => {
 
                         <View style={styles.couponInfo}>
                             <Text style={styles.userName}>
-                                {couponData?.user?.name}
+                                {couponData?.user?.name || 'Customer'}
                             </Text>
                             <Text style={styles.couponDetail}>
                                 {couponData?.coupon?.title}
                             </Text>
-                            <Text style={styles.discountBadge}>
-                                {couponData?.coupon?.type === 'PERCENTAGE'
-                                    ? `${couponData.coupon.value}% OFF`
-                                    : `₹${couponData.coupon.value} OFF`}
-                            </Text>
+                            <View style={styles.discountBadge}>
+                                <Text style={styles.discountBadgeText}>
+                                    {couponData?.coupon?.type === 'PERCENTAGE'
+                                        ? `${couponData.coupon.value}% OFF`
+                                        : `₹${couponData?.coupon?.value} OFF`}
+                                </Text>
+                            </View>
                         </View>
 
                         <Text style={styles.inputLabel}>
@@ -153,6 +192,7 @@ const StaffScannerScreen = () => {
                             onPress={() => {
                                 setConfirmModal(false)
                                 setIsProcessing(false)
+                                setScannedCode(null)
                             }}
                         >
                             <Text style={styles.cancelText}>Cancel</Text>
@@ -179,6 +219,8 @@ const styles = StyleSheet.create({
         borderWidth: 2,
         borderColor: '#004AAD',
         borderRadius: 20,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     hintText: { color: '#FFF', marginTop: 20, fontWeight: 'bold' },
     modalContainer: {
@@ -199,11 +241,13 @@ const styles = StyleSheet.create({
     couponDetail: { color: '#666', marginVertical: 4 },
     discountBadge: {
         backgroundColor: '#E3F2FD',
-        color: '#004AAD',
         padding: 8,
         borderRadius: 8,
-        fontWeight: 'bold',
         marginTop: 5,
+    },
+    discountBadgeText: {
+        color: '#004AAD',
+        fontWeight: 'bold',
     },
     inputLabel: {
         alignSelf: 'flex-start',

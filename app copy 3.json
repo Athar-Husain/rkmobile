@@ -12,6 +12,7 @@
             "backgroundColor": "#ffffff"
         },
         "assetBundlePatterns": ["**/*"],
+
         "ios": {
             "supportsTablet": true,
             "bundleIdentifier": "com.rkelectronics.app",
@@ -30,6 +31,7 @@
                 "aps-environment": "production"
             }
         },
+
         "android": {
             "package": "com.rkelectronics.app",
             "versionCode": 1,
@@ -44,12 +46,15 @@
                 "android.permission.POST_NOTIFICATIONS",
                 "android.permission.ACCESS_FINE_LOCATION",
                 "android.permission.ACCESS_COARSE_LOCATION",
-                "android.permission.READ_MEDIA_IMAGES"
+                "android.permission.READ_MEDIA_IMAGES",
+                "android.permission.ACCESS_NOTIFICATION_POLICY"
             ]
         },
+
         "web": {
             "favicon": "./assets/images/favicon.png"
         },
+
         "plugins": [
             [
                 "expo-image-picker",
@@ -82,19 +87,21 @@
                         "useFrameworks": "static"
                     },
                     "android": {
-                        "kotlinVersion": "1.9.24",
-                        "compileSdkVersion": 35,
-                        "targetSdkVersion": 35,
-                        "minSdkVersion": 24
+                      "kotlinVersion": "1.9.24",
+                        "compileSdkVersion": 34,
+                        "targetSdkVersion": 34,
+                        "minSdkVersion": 23
                     }
                 }
             ]
         ],
+
         "extra": {
             "eas": {
                 "projectId": "c7786c41-d2fd-4003-b905-6c3915b62196"
             }
         },
+
         "owner": "expouser1010"
     }
 }
