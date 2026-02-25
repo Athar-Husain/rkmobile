@@ -35,6 +35,8 @@ const OrderHistoryScreen = () => {
         (state) => state.purchase
     )
 
+    // console.log("mypurchases", mypurchases)
+
     const [selectedOrder, setSelectedOrder] = useState(null)
     const [modalVisible, setModalVisible] = useState(false)
 

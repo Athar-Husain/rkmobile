@@ -25,7 +25,7 @@ export default function NotificationsScreen() {
         notificationMessage,
     } = useSelector((state) => state.notifications)
 
-    // console.log('notifications', notifications)
+    console.log('notifications', notifications)
 
     useEffect(() => {
         dispatch(getNotifications())

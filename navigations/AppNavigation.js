@@ -1,19 +1,17 @@
-// navigations/AppNavigation.js
+// AppNavigation.js
 import React, { useEffect } from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import { useSelector, useDispatch } from 'react-redux'
-import { ActivityIndicator, View, StyleSheet } from 'react-native'
+import { ActivityIndicator, View, StyleSheet, Text } from 'react-native'
 import AuthStack from './AuthStack'
 import MainStack from './MainStack'
 import OnboardingStack from './OnboardingStack'
+import StaffStack from './StaffStack'
 import { COLORS } from '../constants'
 import {
     initializeApplication,
-    selectUserType,
     setAppReady,
 } from '../redux/features/Auth/AuthSlice'
-import { Text } from 'react-native'
-import StaffStack from './StaffStack'
 
 const AppNavigation = () => {
     const dispatch = useDispatch()
@@ -24,25 +22,21 @@ const AppNavigation = () => {
         isInitializing,
         hasCompletedOnboarding,
     } = useSelector((state) => state.auth)
-
     const userType = user?.userType
-    console.log('userType', user?.userType)
 
     useEffect(() => {
         const initApp = async () => {
             try {
                 await dispatch(initializeApplication()).unwrap()
-            } catch (error) {
-                console.log('App initialization error:', error)
-                // Even if initialization fails, mark app as ready
+            } catch (err) {
+                console.error('App initialization failed:', err)
+            } finally {
                 dispatch(setAppReady())
             }
         }
-
         initApp()
     }, [dispatch])
 
-    // Show loading screen while initializing
     if (!isAppReady || isInitializing) {
         return (
             <View style={styles.loaderContainer}>
@@ -52,19 +46,11 @@ const AppNavigation = () => {
         )
     }
 
-    // If onboarding not completed, show onboarding
-    if (!hasCompletedOnboarding) {
-        return (
-            <NavigationContainer>
-                <OnboardingStack />
-            </NavigationContainer>
-        )
-    }
-
-    // If logged in, show main app, otherwise auth
     return (
         <NavigationContainer>
-            {!isLoggedIn ? (
+            {!hasCompletedOnboarding ? (
+                <OnboardingStack />
+            ) : !isLoggedIn ? (
                 <AuthStack />
             ) : userType === 'staff' ? (
                 <StaffStack />
@@ -72,9 +58,6 @@ const AppNavigation = () => {
                 <MainStack />
             )}
         </NavigationContainer>
-        // <NavigationContainer>
-        //     {isLoggedIn ? <MainStack /> : <AuthStack />}
-        // </NavigationContainer>
     )
 }
 
@@ -85,11 +68,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: '#fff',
     },
-    loadingText: {
-        marginTop: 12,
-        fontSize: 16,
-        color: COLORS.primary,
-    },
+    loadingText: { marginTop: 12, fontSize: 16, color: COLORS.primary },
 })
 
 export default AppNavigation

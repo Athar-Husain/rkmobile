@@ -1,10 +1,8 @@
 import axios from 'axios'
-
 import { Platform } from 'react-native'
 import { TokenManager } from '../../../utils/tokenManager'
 import { BASE_API_URL } from '../../../utils/baseurl'
 
-// const BASE_API_URL = import.meta.env.VITE_BACKEND_URL
 const PURCHASE_URL = `${BASE_API_URL}/api/purchase`
 
 const axiosInstance = axios.create({
@@ -24,11 +22,14 @@ axiosInstance.interceptors.request.use(
 )
 
 const PurchaseService = {
-    // ----------------
+    // ==========================
     // USER
-    // ----------------
+    // ==========================
     getMyPurchases: () =>
         axiosInstance.get('/getMyPurchases').then((res) => res.data),
+
+    getMyRecordedPurchases: () =>
+        axiosInstance.get('/getMyRecordedPurchases').then((res) => res.data),
 
     getPurchaseById: (id) =>
         axiosInstance.get(`/getPurchaseById/${id}`).then((res) => res.data),
@@ -43,9 +44,12 @@ const PurchaseService = {
             .patch(`/updateFeedback/${id}/feedback`, data)
             .then((res) => res.data),
 
-    // ----------------
-    // STAFF
-    // ----------------
+    // ==========================
+    // STAFF POS
+    // ==========================
+    previewPurchase: (data) =>
+        axiosInstance.post('/previewPurchase', data).then((res) => res.data),
+
     recordPurchase: (data) =>
         axiosInstance.post('/recordPurchase', data).then((res) => res.data),
 
@@ -62,18 +66,18 @@ const PurchaseService = {
             .patch(`/cancelPurchase/${id}/cancel`, data)
             .then((res) => res.data),
 
-    // ----------------
+    // ==========================
     // REPORTS
-    // ----------------
+    // ==========================
     getStoreSalesReport: (storeId) =>
         axiosInstance.get(`/report/store/${storeId}`).then((res) => res.data),
 
     getUserSpendingReport: (userId) =>
         axiosInstance.get(`/report/user/${userId}`).then((res) => res.data),
 
-    // ----------------
+    // ==========================
     // ADMIN
-    // ----------------
+    // ==========================
     getAllPurchases: () =>
         axiosInstance.get('/getAllPurchases').then((res) => res.data),
 
@@ -82,11 +86,11 @@ const PurchaseService = {
             .patch(`/refundPurchase/${id}/refund`, data)
             .then((res) => res.data),
 
-    exportPurchases: () =>
-        axiosInstance.get('/export', { responseType: 'blob' }),
-
     deletePurchase: (id) =>
         axiosInstance.delete(`/deletePurchase/${id}`).then((res) => res.data),
+
+    exportPurchases: () =>
+        axiosInstance.get('/export', { responseType: 'blob' }),
 }
 
 export default PurchaseService

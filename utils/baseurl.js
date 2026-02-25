@@ -4,7 +4,7 @@
 // export const BASE_API_URL = 'http://10.141.171.220:5000' // my Reno
 // export const BASE_API_URL = 'http://10.163.184.220:5000' // my Reno
 // export const BASE_API_URL = 'http://10.233.138.220:5000' // my Reno
-export const BASE_API_URL = 'http://10.233.138.220:5000' // my Reno
+export const BASE_API_URL = 'http://10.207.242.220:5000' // my Reno
 // export const BASE_API_URL = 'https://mwbackend-pi.vercel.app' // Server
 // export const BASE_API_URL = 'http://192.168.0.6:9000' // teksoft
 // export const BASE_API_URL = 'http://192.168.0.2:5000' // teksoft

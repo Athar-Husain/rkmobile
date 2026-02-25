@@ -1,17 +1,17 @@
 // App.js
+import React, { useCallback, useEffect } from 'react'
+import { View, ActivityIndicator, Text, LogBox } from 'react-native'
 import * as SplashScreen from 'expo-splash-screen'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { useFonts } from 'expo-font'
-import { useCallback, useEffect } from 'react'
-import { FONTS } from './constants/fonts'
-import { LogBox, View, ActivityIndicator, Text } from 'react-native'
-import { ThemeProvider } from './theme/ThemeProvider'
 import { Provider } from 'react-redux'
-import { store, persistor } from './redux/store'
-import FlashMessage from 'react-native-flash-message'
-import { COLORS } from './constants'
-import AppNavigation from './navigations/AppNavigation'
 import { PersistGate } from 'redux-persist/integration/react'
+import FlashMessage from 'react-native-flash-message'
+import { store, persistor } from './redux/store'
+import { ThemeProvider } from './theme/ThemeProvider'
+import AppNavigation from './navigations/AppNavigation'
+import { FONTS } from './constants/fonts'
+import { COLORS } from './constants'
 import { requestNotificationPermission } from './utils/requestNotificationPermission'
 
 // Prevent auto-hide splash screen
@@ -26,9 +26,9 @@ LogBox.ignoreLogs([
 export default function App() {
     const [fontsLoaded, fontError] = useFonts(FONTS)
 
-    // ✅ REQUEST NOTIFICATION PERMISSION ON APP START
+    // REQUEST NOTIFICATION PERMISSION
     useEffect(() => {
-        requestNotificationPermission()
+        requestNotificationPermission().catch(console.error)
     }, [])
 
     const onLayoutRootView = useCallback(async () => {

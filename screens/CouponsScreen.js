@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import {
     View,
     Text,
@@ -40,39 +40,43 @@ const CouponsScreen = () => {
         isCouponLoading,
     } = useSelector((state) => state.coupon)
 
-    // Fetch coupons based on active tab
-    useFocusEffect(
-        React.useCallback(() => {
-            const fetchData = async () => {
-                if (activeTab === 'discover') {
-                    const res = await dispatch(fetchDiscoverCoupons())
-                    if (res.meta.requestStatus === 'fulfilled') {
-                        // Flatten and sort categorized coupons
-                        const allCoupons = Object.values(
-                            res.payload.categorizedCoupons || {}
-                        ).flat()
-                        const sortedCoupons = allCoupons.sort((a, b) => {
-                            const createdDiff =
-                                new Date(b.createdAt) - new Date(a.createdAt)
-                            if (createdDiff !== 0) return createdDiff
-                            return (
-                                new Date(a.validUntil) - new Date(b.validUntil)
-                            )
-                        })
-                        dispatch({
-                            type: 'coupon/setDiscoverCoupons',
-                            payload: sortedCoupons,
-                        })
-                    }
-                }
-                if (activeTab === 'active') await dispatch(fetchActiveCoupons())
-                if (activeTab === 'history') {
-                    await dispatch(fetchHistoryCoupons())
-                    await dispatch(fetchUserSavings())
-                }
+    const fetchCoupons = useCallback(async () => {
+        dispatch(fetchUserSavings())
+        if (activeTab === 'discover') {
+            const res = await dispatch(fetchDiscoverCoupons())
+            if (res.meta.requestStatus === 'fulfilled') {
+                const allCoupons = Object.values(
+                    res.payload.categorizedCoupons || {}
+                ).flat()
+                const sortedCoupons = allCoupons.sort((a, b) => {
+                    const createdDiff =
+                        new Date(b.createdAt).getTime() -
+                        new Date(a.createdAt).getTime()
+                    if (createdDiff !== 0) return createdDiff
+                    return (
+                        new Date(a.validUntil).getTime() -
+                        new Date(b.validUntil).getTime()
+                    )
+                })
+                dispatch({
+                    type: 'coupon/setDiscoverCoupons',
+                    payload: sortedCoupons,
+                })
             }
-            fetchData()
-        }, [dispatch, activeTab])
+        }
+        if (activeTab === 'active') await dispatch(fetchActiveCoupons())
+        if (activeTab === 'history') {
+            await Promise.all([
+                dispatch(fetchHistoryCoupons()),
+                dispatch(fetchUserSavings()),
+            ])
+        }
+    }, [activeTab, dispatch])
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchCoupons()
+        }, [fetchCoupons])
     )
 
     const handleClaim = (id) => {
@@ -83,147 +87,144 @@ const CouponsScreen = () => {
         })
     }
 
-    const renderHeader = () => {
-        return (
-            <View style={styles.savingsCard}>
-                <View>
-                    <Text style={styles.savingsLabel}>Total Savings</Text>
-                    <Text style={styles.savingsValue}>
-                        ₹{userSavings.totalAmount}
-                    </Text>
-                </View>
-                <View style={styles.savingsStat}>
-                    <Text style={styles.savingsLabel}>Redeemed</Text>
-                    <Text style={styles.savingsValue}>{userSavings.count}</Text>
-                </View>
-                <MaterialCommunityIcons
-                    name="wallet-giftcard"
-                    size={40}
-                    color="rgba(255,255,255,0.3)"
-                />
+    const renderHeader = () => (
+        <View style={styles.savingsCard}>
+            <View>
+                <Text style={styles.savingsLabel}>Total Savings</Text>
+                <Text style={styles.savingsValue}>
+                    ₹{userSavings.totalAmount || 0}
+                </Text>
             </View>
-        )
-    }
+            <View style={styles.savingsStat}>
+                <Text style={styles.savingsLabel}>Redeemed</Text>
+                <Text style={styles.savingsValue}>
+                    {userSavings.count || 0}
+                </Text>
+            </View>
+            <MaterialCommunityIcons
+                name="wallet-giftcard"
+                size={40}
+                color="rgba(255,255,255,0.3)"
+            />
+        </View>
+    )
 
-    const renderCoupon = ({ item }) => {
-        const isDiscover = activeTab === 'discover'
-        const isHistory = activeTab === 'history'
-        const couponData = item.couponId || item
+    const renderCoupon = useCallback(
+        ({ item }) => {
+            const isDiscover = activeTab === 'discover'
+            const isHistory = activeTab === 'history'
+            const couponData = item.couponId || item
 
-        const now = new Date()
-        const expiryDate = new Date(couponData.validUntil)
-        const daysLeft = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24))
+            const now = new Date()
+            const expiryDate = new Date(couponData.validUntil)
+            const daysLeft = Math.max(
+                Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)),
+                0
+            )
 
-        // Theme color based on urgency
-        const themeColor =
-            daysLeft <= 2 && expiryDate > now
-                ? '#E74C3C'
-                : couponData.color || '#004AAD'
+            const themeColor =
+                daysLeft <= 2 && expiryDate > now
+                    ? '#E74C3C'
+                    : couponData.color || '#004AAD'
 
-        return (
-            <TouchableOpacity
-                activeOpacity={isDiscover ? 1 : 0.8}
-                onPress={() => {
-                    if (activeTab === 'active') {
-                        setSelectedCoupon(item)
-                        setModalVisible(true)
-                    }
-                }}
-                style={[styles.couponCard, isHistory && { opacity: 0.7 }]}
-            >
-                {/* Left Discount Panel */}
-                <View
-                    style={[
-                        styles.leftTab,
-                        { backgroundColor: isHistory ? '#BDC3C7' : themeColor },
-                    ]}
+            return (
+                <TouchableOpacity
+                    activeOpacity={isDiscover ? 1 : 0.8}
+                    onPress={() => {
+                        if (activeTab === 'active') {
+                            setSelectedCoupon(item)
+                            setModalVisible(true)
+                        }
+                    }}
+                    style={[styles.couponCard, isHistory && { opacity: 0.7 }]}
                 >
-                    <Text style={styles.discountText}>
-                        {couponData.type === 'PERCENTAGE'
-                            ? `${couponData.value}%`
-                            : `₹${couponData.value}`}
-                        {'\n'}OFF
-                    </Text>
-                    <View style={styles.cutoutTop} />
-                    <View style={styles.cutoutBottom} />
-                </View>
+                    {/* Left Discount Panel */}
+                    <View
+                        style={[
+                            styles.leftTab,
+                            {
+                                backgroundColor: isHistory
+                                    ? '#BDC3C7'
+                                    : themeColor,
+                            },
+                        ]}
+                    >
+                        <Text style={styles.discountText}>
+                            {couponData.type === 'PERCENTAGE'
+                                ? `${couponData.value}%`
+                                : `₹${couponData.value}`}
+                            {'\n'}OFF
+                        </Text>
+                        <View style={styles.cutoutTop} />
+                        <View style={styles.cutoutBottom} />
+                    </View>
 
-                {/* Right Content */}
-                <View style={styles.rightContent}>
-                    <Text style={styles.couponTitle} numberOfLines={1}>
-                        {couponData.title}
-                    </Text>
+                    {/* Right Content */}
+                    <View style={styles.rightContent}>
+                        <Text style={styles.couponTitle} numberOfLines={1}>
+                            {couponData.title}
+                        </Text>
 
-                    <Text style={styles.couponSub} numberOfLines={2}>
-                        {couponData.description}
-                    </Text>
+                        <Text style={styles.couponSub} numberOfLines={2}>
+                            {couponData.description}
+                        </Text>
 
-                    {/* Badge */}
-                    {/* {couponData.targeting?.type && (
-                        <View style={styles.badge}>
-                            <Text style={styles.badgeText}>
-                                {couponData.targeting.type === 'REFERRAL'
-                                    ? 'Referral Only'
-                                    : couponData.targeting.segments?.[0] ||
-                                      'All Users'}
-                            </Text>
-                            <Text style={styles.badgeText}>
-                                {couponData?.targeting?.type}
-                            </Text>
-                        </View>
-                    )} */}
+                        <Text style={styles.couponExpiry}>
+                            {expiryDate > now
+                                ? `Expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`
+                                : 'Expired'}
+                        </Text>
 
-                    {/* Expiry */}
-                    <Text style={styles.couponExpiry}>
-                        {expiryDate > now
-                            ? `Expires in ${daysLeft} day${daysLeft > 1 ? 's' : ''}`
-                            : 'Expired'}
-                    </Text>
-
-                    {/* Buttons or Status */}
-                    {isDiscover ? (
-                        <TouchableOpacity
-                            style={[
-                                styles.claimBtn,
-                                { backgroundColor: themeColor },
-                            ]}
-                            onPress={() => handleClaim(couponData._id)}
-                        >
-                            <Text style={styles.claimBtnText}>CLAIM OFFER</Text>
-                        </TouchableOpacity>
-                    ) : (
-                        <View style={styles.statusRow}>
-                            <MaterialCommunityIcons
-                                name={
-                                    isHistory
-                                        ? 'check-circle-outline'
-                                        : 'qrcode-scan'
-                                }
-                                size={16}
-                                color={isHistory ? '#7f8c8d' : themeColor}
-                            />
-                            <Text
+                        {isDiscover ? (
+                            <TouchableOpacity
                                 style={[
-                                    styles.statusText,
-                                    {
-                                        color: isHistory
-                                            ? '#7f8c8d'
-                                            : themeColor,
-                                    },
+                                    styles.claimBtn,
+                                    { backgroundColor: themeColor },
                                 ]}
+                                onPress={() => handleClaim(couponData._id)}
+                                disabled={couponData.status !== 'ACTIVE'}
                             >
-                                {isHistory
-                                    ? item.status === 'USED'
-                                        ? 'Redeemed'
-                                        : 'Expired'
-                                    : 'Tap to Redeem'}
-                            </Text>
-                        </View>
-                    )}
-                </View>
-            </TouchableOpacity>
-        )
-    }
+                                <Text style={styles.claimBtnText}>
+                                    {couponData.status === 'ACTIVE'
+                                        ? 'CLAIM OFFER'
+                                        : 'CLAIMED'}
+                                </Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <View style={styles.statusRow}>
+                                <MaterialCommunityIcons
+                                    name={
+                                        isHistory
+                                            ? 'check-circle-outline'
+                                            : 'qrcode-scan'
+                                    }
+                                    size={16}
+                                    color={isHistory ? '#7f8c8d' : themeColor}
+                                />
+                                <Text
+                                    style={[
+                                        styles.statusText,
+                                        {
+                                            color: isHistory
+                                                ? '#7f8c8d'
+                                                : themeColor,
+                                        },
+                                    ]}
+                                >
+                                    {isHistory
+                                        ? item.status === 'USED'
+                                            ? 'Redeemed'
+                                            : 'Expired'
+                                        : 'Tap to Redeem'}
+                                </Text>
+                            </View>
+                        )}
+                    </View>
+                </TouchableOpacity>
+            )
+        },
+        [activeTab]
+    )
 
     return (
         <SafeAreaView style={styles.container}>
@@ -261,13 +262,21 @@ const CouponsScreen = () => {
                 <FlatList
                     data={
                         activeTab === 'discover'
-                            ? discoverCoupons
+                            ? Array.isArray(discoverCoupons)
+                                ? discoverCoupons
+                                : []
                             : activeTab === 'active'
-                              ? activeCoupons
-                              : historyCoupons
+                              ? Array.isArray(activeCoupons)
+                                  ? activeCoupons
+                                  : []
+                              : Array.isArray(historyCoupons)
+                                ? historyCoupons
+                                : []
                     }
                     renderItem={renderCoupon}
-                    keyExtractor={(item) => item._id || item.couponId?._id}
+                    keyExtractor={(item, index) =>
+                        item._id || item.couponId?._id || index.toString()
+                    }
                     contentContainerStyle={styles.listContainer}
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
@@ -281,6 +290,8 @@ const CouponsScreen = () => {
                             </Text>
                         </View>
                     }
+                    refreshing={isCouponLoading}
+                    onRefresh={fetchCoupons}
                 />
             )}
 
@@ -296,6 +307,34 @@ const CouponsScreen = () => {
                             Let the staff scan this QR code
                         </Text>
 
+                        {/* <View style={styles.qrWrapper}>
+                            {selectedCoupon?.qrCodeData && (
+                                <QRCode
+                                    value={selectedCoupon.qrCodeData}
+                                    size={width * 0.55}
+                                    color="black"
+                                    backgroundColor="white"
+                                />
+                            )}
+                        </View> */}
+
+                        {/* <View style={styles.qrWrapper}>
+                            {selectedCoupon?.qrCodeImage ? (
+                                <QRCode
+                                    value={selectedCoupon.qrCodeImage}
+                                    size={width * 0.55}
+                                />
+                            ) : selectedCoupon?.uniqueCode ? (
+                                <QRCode
+                                    value={selectedCoupon.uniqueCode}
+                                    size={width * 0.55}
+                                />
+                            ) : null}
+                        </View>
+                        <Text style={styles.uniqueCodeText}>
+                            {selectedCoupon?.uniqueCode}
+                        </Text> */}
+
                         <View style={styles.qrWrapper}>
                             {selectedCoupon?.uniqueCode && (
                                 <QRCode
@@ -306,6 +345,28 @@ const CouponsScreen = () => {
                                 />
                             )}
                         </View>
+
+                        {/* <View style={styles.qrWrapper}>
+                            {selectedCoupon?.uniqueCode && (
+                                <QRCode
+                                    value={selectedCoupon.uniqueCode}
+                                    size={width * 0.55}
+                                    color="black"
+                                    backgroundColor="white"
+                                />
+                            )}
+                        </View> */}
+
+                        {/* <View style={styles.qrWrapper}>
+                            {selectedCoupon?.qrCodeData && (
+                                <QRCode
+                                    value={selectedCoupon.qrCodeData}
+                                    size={width * 0.75} // Restore the size to 75% of the screen width (larger QR)
+                                    color="black"
+                                    backgroundColor="white"
+                                />
+                            )}
+                        </View> */}
 
                         <Text style={styles.uniqueCodeText}>
                             {selectedCoupon?.uniqueCode}
@@ -414,15 +475,6 @@ const styles = StyleSheet.create({
     couponTitle: { fontSize: 16, fontWeight: '700', color: '#2C3E50' },
     couponSub: { fontSize: 12, color: '#7F8C8D', marginVertical: 4 },
     couponExpiry: { fontSize: 11, fontWeight: '600', color: '#E67E22' },
-    badge: {
-        backgroundColor: '#004AAD',
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 6,
-        alignSelf: 'flex-start',
-        marginVertical: 4,
-    },
-    badgeText: { color: '#FFF', fontSize: 10, fontWeight: '700' },
     claimBtn: {
         paddingVertical: 8,
         paddingHorizontal: 15,

@@ -1,6 +1,6 @@
 // index.js
 import { registerRootComponent } from 'expo'
-import { getApp } from '@react-native-firebase/app'
+import { getApps, getApp, initializeApp } from '@react-native-firebase/app'
 import {
     getMessaging,
     setBackgroundMessageHandler,
@@ -8,10 +8,16 @@ import {
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native'
 import App from './App'
 import { displayLocalNotification } from './hooks/useNotifications'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
-// ==========================================
-// 1. CREATE NOTIFICATION CHANNELS FIRST
-// ==========================================
+// =====================
+// 1. SAFE FIREBASE APP INIT
+// =====================
+const firebaseApp = getApps().length ? getApp() : initializeApp()
+
+// =====================
+// 2. CREATE NOTIFICATION CHANNELS
+// =====================
 const createNotificationChannels = async () => {
     try {
         await notifee.createChannel({
@@ -21,60 +27,37 @@ const createNotificationChannels = async () => {
             sound: 'default',
             vibration: true,
         })
-
         await notifee.createChannel({
             id: 'default',
             name: 'Default Notifications',
-            importance: AndroidImportance.HIGH, // Set default to high priority
+            importance: AndroidImportance.DEFAULT,
             sound: 'default',
             vibration: true,
         })
-
         console.log('✅ Notification channels created')
-    } catch (error) {
-        console.error('❌ Failed to create channels:', error)
+    } catch (err) {
+        console.error('❌ Failed to create channels:', err)
     }
 }
-
-// Create channels immediately
 createNotificationChannels()
 
-// ==========================================
-// 2. FIREBASE BACKGROUND MESSAGE HANDLER
-// ==========================================
-const app = getApp()
-const messaging = getMessaging(app)
-
-// console.log(
-//   '🔥 Firebase App Options:',
-//   getApp().options
-// )
-
+// =====================
+// 3. FIREBASE BACKGROUND MESSAGES
+// =====================
+const messaging = getMessaging(firebaseApp)
 setBackgroundMessageHandler(messaging, async (remoteMessage) => {
-    console.log('📩 Background Message received:', remoteMessage)
-
-    // Display notification for data-only or combined messages
-    await displayLocalNotification(remoteMessage)
+    console.log('📩 Background message received:', remoteMessage)
+    await displayLocalNotification(remoteMessage).catch(console.error)
 })
 
-// ==========================================
-// 3. NOTIFEE BACKGROUND EVENT HANDLER
-// ==========================================
+// =====================
+// 4. NOTIFEE BACKGROUND EVENTS
+// =====================
 notifee.onBackgroundEvent(async ({ type, detail }) => {
-    console.log('📱 Notifee Background Event:', type, detail)
-
     const { notification, pressAction } = detail
-
     switch (type) {
         case EventType.PRESS:
-            console.log(
-                '🔔 Notification pressed in background/killed:',
-                notification
-            )
-
             try {
-                const AsyncStorage =
-                    require('@react-native-async-storage/async-storage').default
                 await AsyncStorage.setItem(
                     'lastNotificationPress',
                     JSON.stringify({
@@ -83,29 +66,20 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
                         timestamp: Date.now(),
                     })
                 )
-            } catch (error) {
-                console.error('❌ Failed to store notification data:', error)
+            } catch (err) {
+                console.error('❌ Failed to save notification press:', err)
             }
             break
-
         case EventType.DISMISSED:
-            console.log('🔔 Notification dismissed in background')
-            break
-
         case EventType.ACTION_PRESS:
-            console.log('🔔 Action pressed in background:', pressAction)
-            break
-
         case EventType.DELIVERED:
-            console.log('🔔 Notification delivered in background')
             break
-
         default:
             console.log('🔔 Unknown background event:', type)
     }
 })
 
-// ==========================================
-// 4. REGISTER APP
-// ==========================================
+// =====================
+// 5. REGISTER APP
+// =====================
 registerRootComponent(App)

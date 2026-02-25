@@ -83,24 +83,54 @@ export const initializeApplication = createAsyncThunk(
 
             let userData = null
             let userType = null
-            const token = await TokenManager.getToken()
+            // const token = await TokenManager.getToken()
 
-            if (token) {
-                // Check if customer
-                if (await AuthService.isAuthenticated()) {
+            // if (token) {
+            //     // Check if customer
+            //     if (await AuthService.isAuthenticated()) {
+            //         const statusResponse = await AuthService.getLoginStatus()
+            //         userData = statusResponse.user
+            //         userType = 'customer'
+            //     }
+            //     // Check if staff
+            //     else if (await StaffService.getStaffLoginStatus()) {
+            //         const statusResponse =
+            //             await StaffService.getStaffLoginStatus()
+            //         userData = statusResponse.user
+            //         userType = 'staff'
+            //     } else {
+            //         await clearAuthStorage()
+            //     }
+            // }
+
+            const token = await TokenManager.getToken()
+            const storedUserType = await AsyncStorage.getItem('userType')
+
+            if (!token || !storedUserType) {
+                return {
+                    deviceId,
+                    userData: null,
+                    userType: null,
+                    isLoggedIn: false,
+                    hasCompletedOnboarding,
+                }
+            }
+
+            try {
+                if (storedUserType === 'customer') {
                     const statusResponse = await AuthService.getLoginStatus()
                     userData = statusResponse.user
                     userType = 'customer'
                 }
-                // Check if staff
-                else if (await StaffService.getStaffLoginStatus()) {
+
+                if (storedUserType === 'staff') {
                     const statusResponse =
                         await StaffService.getStaffLoginStatus()
                     userData = statusResponse.user
                     userType = 'staff'
-                } else {
-                    await clearAuthStorage()
                 }
+            } catch (error) {
+                await clearAuthStorage()
             }
 
             return {
@@ -254,7 +284,7 @@ export const staffResetPassword = createAsyncThunk(
 )
 
 // -------------------- LOGOUT --------------------
-export const logout = createAsyncThunk('auth/logout', async (_, thunkAPI) => {
+export const logout1 = createAsyncThunk('auth/logout1', async (_, thunkAPI) => {
     try {
         const state = thunkAPI.getState()
         if (state.auth.user.userType === 'staff') {
@@ -270,6 +300,24 @@ export const logout = createAsyncThunk('auth/logout', async (_, thunkAPI) => {
     }
 })
 
+// '9880163164'
+
+export const logout = createAsyncThunk('auth/logout', async (_, thunkAPI) => {
+    try {
+        const state = thunkAPI.getState()
+        if (state.auth.userType === 'staff') {
+            await StaffService.staffLogout()
+        } else {
+            await AuthService.logout()
+        }
+    } catch (e) {
+        console.warn('Logout API failed, continuing local cleanup')
+    }
+
+    await clearAuthStorage()
+    safeShowMessage({ message: 'Logged out successfully', type: 'info' })
+    return true
+})
 // -------------------- PROFILE --------------------
 export const getProfile = createAsyncThunk(
     'auth/getProfile',
@@ -458,6 +506,7 @@ const authSlice = createSlice({
                 state.userType = 'customer'
                 state.tempToken = null
                 state.error = null
+                AsyncStorage.setItem('userType', 'customer')
             })
             .addCase(signinStaffSendOTP.fulfilled, (state, action) => {
                 state.isLoading = false
@@ -471,6 +520,7 @@ const authSlice = createSlice({
                 state.userType = 'staff'
                 state.tempToken = null
                 state.error = null
+                AsyncStorage.setItem('userType', 'staff')
             })
 
             // -------------------- PASSWORD RESET --------------------
@@ -499,6 +549,7 @@ const authSlice = createSlice({
                 state.tempToken = null
                 state.error = null
                 state.isLoading = false
+                AsyncStorage.removeItem('userType')
             })
 
             // -------------------- ONBOARDING --------------------

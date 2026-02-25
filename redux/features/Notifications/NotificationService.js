@@ -1,70 +1,56 @@
-import AsyncStorage from '@react-native-async-storage/async-storage'
-import messaging from '@react-native-firebase/messaging'
-import { Platform } from 'react-native'
 import axios from 'axios'
-import { BASE_API_URL } from '../../../utils/baseurl.js'
+import { Platform } from 'react-native'
 import { TokenManager } from '../../../utils/tokenManager'
+import { BASE_API_URL } from '../../../utils/baseurl'
+
+// const COUPON_URL = `${BASE_API_URL}/api/coupons`
 
 const NOTIFICATION_URL = `${BASE_API_URL}/api/notifications`
 
-export const NotificationService = {
-    getFCMToken: async () => {
-        try {
-            // Register device for remote messages (iOS requirement)
-            if (Platform.OS === 'ios') {
-                await messaging().registerDeviceForRemoteMessages()
-            }
+const axiosInstance = axios.create({
+    baseURL: NOTIFICATION_URL,
+    headers: { 'Content-Type': 'application/json' },
+})
 
-            // Check if token already exists
-            let fcmToken = await AsyncStorage.getItem('fcm_token')
+axiosInstance.interceptors.request.use(async (config) => {
+    const token = await TokenManager.getToken()
+    if (token) config.headers.Authorization = `Bearer ${token}`
+    config.headers['X-Device-Platform'] = Platform.OS
+    return config
+})
 
-            if (fcmToken) {
-                console.log('🔑 Using existing FCM token:', fcmToken)
-                return fcmToken
-            }
+// src/features/notifications/NotificationService.js
 
-            // Generate new token
-            const newToken = await messaging().getToken()
+const NotificationService = {
+    // USER - 3 TAB SYSTEM
+    myNotifications: () =>
+        axiosInstance.get('/myNotifications').then((res) => res.data),
 
-            if (newToken) {
-                await AsyncStorage.setItem('fcm_token', newToken)
-                console.log('🆕 New FCM token generated:', newToken)
-                return newToken
-            } else {
-                console.error('❌ Failed to generate FCM token')
-                return null
-            }
-        } catch (error) {
-            console.error('❌ Error during FCM token generation:', error)
-            return null
-        }
-    },
+    read: () =>
+        axiosInstance.get('/read').then((res) => res.data),
 
-    sendFCMTokenToServer: async () => {
-        try {
-            const token = await TokenManager.getToken()
-            if (!token) {
-                return
-            }
+    getCouponHistory: () =>
+        axiosInstance.get('/getMyCouponHistory').then((res) => res.data),
 
-            const fcmToken = await this.getFCMToken()
-            if (!fcmToken) {
-                return
-            }
+    getCouponSavings: () =>
+        axiosInstance.get('/getMyCouponSavings').then((res) => res.data),
 
-            await axios.post(
-                `${NOTIFICATION_URL}/register-token`,
-                { fcmToken },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            )
-        } catch (error) {
-            console.error('Error sending FCM token to server:', error)
-        }
-    },
+    read: (id) =>
+        axiosInstance.post(`/read/${id}`).then((res) => res.data),
 
-    // ... other notification related methods ...
+    // STAFF
+    read: (data) =>
+        axiosInstance.post('/read', data).then((res) => res.data),
+
+    redeemCoupon: (data) =>
+        axiosInstance.post('/redeem', data).then((res) => res.data),
+
+    // ADMIN
+    createCoupon: (data) =>
+        axiosInstance.post('/createCoupon', data).then((res) => res.data),
+
+    getAllCouponsAdmin: () =>
+        axiosInstance.get('/getAllCoupons').then((res) => res.data),
 }
+
+export default NotificationService

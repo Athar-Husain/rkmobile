@@ -1,13 +1,13 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-// import { toast } from 'react-toastify';
 import PurchaseService from './PurchaseService'
-
 import { safeShowMessage } from '../Auth/AuthSlice'
 
 const initialState = {
     purchases: [],
     mypurchases: [],
+    myrecordedpurchases: [],
     purchase: null,
+    staffPOSSummary: null,
     reports: null,
     isPurchaseLoading: false,
     isPurchaseSuccess: false,
@@ -34,6 +34,16 @@ export const getMyPurchases = createAsyncThunk(
     async (_, thunkAPI) => {
         try {
             return await PurchaseService.getMyPurchases()
+        } catch (error) {
+            return thunkAPI.rejectWithValue(getErrorMessage(error))
+        }
+    }
+)
+export const getMyRecordedPurchases = createAsyncThunk(
+    'purchase/getMyRecordedPurchases',
+    async (_, thunkAPI) => {
+        try {
+            return await PurchaseService.getMyRecordedPurchases()
         } catch (error) {
             return thunkAPI.rejectWithValue(getErrorMessage(error))
         }
@@ -73,12 +83,23 @@ export const updateFeedback = createAsyncThunk(
     }
 )
 
-// STAFF
+// STAFF POS
+export const previewPurchase = createAsyncThunk(
+    'purchase/previewPurchase',
+    async (payload, thunkAPI) => {
+        try {
+            return await PurchaseService.previewPurchase(payload)
+        } catch (error) {
+            return thunkAPI.rejectWithValue(getErrorMessage(error))
+        }
+    }
+)
+
 export const recordPurchase = createAsyncThunk(
     'purchase/recordPurchase',
-    async (data, thunkAPI) => {
+    async (payload, thunkAPI) => {
         try {
-            return await PurchaseService.recordPurchase(data)
+            return await PurchaseService.recordPurchase(payload)
         } catch (error) {
             return thunkAPI.rejectWithValue(getErrorMessage(error))
         }
@@ -191,15 +212,43 @@ const purchaseSlice = createSlice({
         CLEAR_PURCHASE: (state) => {
             state.purchase = null
         },
+        clearPOSSummary: (state) => {
+            state.staffPOSSummary = null
+        },
     },
     extraReducers: (builder) => {
         builder
+            // USER
             .addCase(getMyPurchases.fulfilled, (state, action) => {
                 state.mypurchases = action.payload.purchases
+            })
+            .addCase(getMyRecordedPurchases.fulfilled, (state, action) => {
+                state.myrecordedpurchases = action.payload.purchases
             })
             .addCase(getAllPurchases.fulfilled, (state, action) => {
                 state.purchases = action.payload.purchases || action.payload
             })
+            .addCase(getPurchaseById.fulfilled, (state, action) => {
+                state.purchase = action.payload.purchase
+            })
+            // STAFF POS
+            .addCase(previewPurchase.fulfilled, (state, action) => {
+                state.staffPOSSummary = action.payload.summary
+            })
+            // =================
+            // RECORD PURCHASE
+            // =================
+            .addCase(recordPurchase.fulfilled, (state, action) => {
+                state.purchase = action.payload.purchase
+                state.staffPOSSummary = null
+                state.message = action.payload.message
+                safeShowMessage({
+                    message: action.payload.message,
+                    type: 'success',
+                })
+            })
+
+            // REPORTS
             .addCase(getStoreSalesReport.fulfilled, (state, action) => {
                 state.reports = action.payload
             })
@@ -207,20 +256,9 @@ const purchaseSlice = createSlice({
                 state.reports = action.payload
             })
 
-            .addCase(getPurchaseById.fulfilled, (state, action) => {
-                state.purchase = action.payload.purchase
-            })
-            .addCase(recordPurchase.fulfilled, (state, action) => {
-                state.message = action.payload.message
-                // toast.success(action.payload.message)
-                safeShowMessage({
-                    message: action.payload.message,
-                    type: 'success',
-                })
-            })
+            // REFUND
             .addCase(refundPurchase.fulfilled, (state, action) => {
                 state.message = action.payload.message
-                // toast.success(action.payload.message)
                 safeShowMessage({
                     message: action.payload.message,
                     type: 'success',
@@ -249,16 +287,13 @@ const purchaseSlice = createSlice({
                     state.isPurchaseLoading = false
                     state.isPurchaseError = true
                     state.message = action.payload
-                    // toast.error(action.payload)
-                    safeShowMessage({
-                        message: action.payload,
-                        type: 'danger',
-                    })
+                    safeShowMessage({ message: action.payload, type: 'danger' })
                 }
             )
     },
 })
 
-export const { RESET_PURCHASE_STATE, CLEAR_PURCHASE } = purchaseSlice.actions
+export const { RESET_PURCHASE_STATE, CLEAR_PURCHASE, clearPOSSummary } =
+    purchaseSlice.actions
 
 export default purchaseSlice.reducer

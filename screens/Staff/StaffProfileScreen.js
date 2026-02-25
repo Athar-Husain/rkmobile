@@ -1,5 +1,13 @@
 import React from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native'
+import {
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    Image,
+    ScrollView,
+    Appearance,
+} from 'react-native'
 import { useSelector, useDispatch } from 'react-redux'
 import { logout } from '../../redux/features/Auth/AuthSlice'
 import { COLORS } from '../../constants'
@@ -8,78 +16,179 @@ const StaffProfileScreen = () => {
     const dispatch = useDispatch()
     const { user } = useSelector((state) => state.auth)
 
+    const colorScheme = Appearance.getColorScheme()
+    const isDark = colorScheme === 'dark'
+
     const handleLogout = () => {
         dispatch(logout())
     }
 
     return (
-        <View style={styles.container}>
+        <ScrollView
+            style={[
+                styles.container,
+                { backgroundColor: isDark ? '#121212' : '#F8F9FB' },
+            ]}
+            contentContainerStyle={{ paddingBottom: 40 }}
+        >
+            {/* Header Section */}
             <View style={styles.header}>
-                <View style={styles.avatar}>
+                <View
+                    style={[styles.avatar, { backgroundColor: COLORS.primary }]}
+                >
                     <Text style={styles.avatarText}>
-                        {user?.name?.charAt(0)}
+                        {user?.name?.charAt(0) || 'U'}
                     </Text>
                 </View>
-                <Text style={styles.name}>{user?.name}</Text>
-                <Text style={styles.role}>{user?.role?.toUpperCase()}</Text>
+                <Text
+                    style={[styles.name, { color: isDark ? '#fff' : '#000' }]}
+                >
+                    {user?.name || 'Unknown'}
+                </Text>
+                <Text
+                    style={[styles.role, { color: isDark ? '#aaa' : '#666' }]}
+                >
+                    {user?.role?.toUpperCase() || 'STAFF'}
+                </Text>
             </View>
 
-            <View style={styles.infoSection}>
-                <Text style={styles.label}>Store ID</Text>
-                <Text style={styles.value}>
+            {/* Info Cards */}
+            <View
+                style={[
+                    styles.infoCard,
+                    { backgroundColor: isDark ? '#1E1E1E' : '#FFF' },
+                ]}
+            >
+                <Text
+                    style={[styles.label, { color: isDark ? '#999' : '#999' }]}
+                >
+                    Store
+                </Text>
+                <Text
+                    style={[styles.value, { color: isDark ? '#fff' : '#000' }]}
+                >
                     {user?.storeId || 'Main Branch'}
                 </Text>
-
-                <View style={styles.divider} />
-
-                <Text style={styles.label}>Permissions</Text>
-                <Text style={styles.value}>
-                    {user?.permissions?.canRedeemCoupon
-                        ? '✓ Coupon Redemption'
-                        : '✗ No Redemption Access'}
-                </Text>
             </View>
 
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-                <Text style={styles.logoutText}>Logout</Text>
+            <View
+                style={[
+                    styles.infoCard,
+                    { backgroundColor: isDark ? '#1E1E1E' : '#FFF' },
+                ]}
+            >
+                <Text
+                    style={[styles.label, { color: isDark ? '#999' : '#999' }]}
+                >
+                    Permissions
+                </Text>
+                {user?.permissions ? (
+                    <>
+                        {user.permissions.canCreatePurchase && (
+                            <Text
+                                style={[
+                                    styles.permission,
+                                    { color: COLORS.success },
+                                ]}
+                            >
+                                ✓ Can Create Purchase
+                            </Text>
+                        )}
+                        {user.permissions.canRedeemCoupon && (
+                            <Text
+                                style={[
+                                    styles.permission,
+                                    { color: COLORS.success },
+                                ]}
+                            >
+                                ✓ Can Redeem Coupons
+                            </Text>
+                        )}
+                        {user.permissions.canVerifyCoupon && (
+                            <Text
+                                style={[
+                                    styles.permission,
+                                    { color: COLORS.success },
+                                ]}
+                            >
+                                ✓ Can Verify Coupons
+                            </Text>
+                        )}
+                        {!user.permissions.canViewBranchReports && (
+                            <Text
+                                style={[
+                                    styles.permission,
+                                    { color: COLORS.warning },
+                                ]}
+                            >
+                                ✗ Cannot View Branch Reports
+                            </Text>
+                        )}
+                    </>
+                ) : (
+                    <Text
+                        style={[styles.permission, { color: COLORS.warning }]}
+                    >
+                        No permissions assigned
+                    </Text>
+                )}
+            </View>
+
+            {/* Logout Button */}
+            <TouchableOpacity
+                style={[
+                    styles.logoutBtn,
+                    { backgroundColor: isDark ? '#2C2C2C' : '#FFEDED' },
+                ]}
+                onPress={handleLogout}
+            >
+                <Text
+                    style={[
+                        styles.logoutText,
+                        { color: isDark ? '#FF3B30' : '#FF3B30' },
+                    ]}
+                >
+                    Logout
+                </Text>
             </TouchableOpacity>
-        </View>
+        </ScrollView>
     )
 }
 
+export default StaffProfileScreen
+
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8F9FB', padding: 20 },
+    container: { flex: 1, padding: 20 },
     header: { alignItems: 'center', marginVertical: 30 },
     avatar: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: COLORS.primary,
+        width: 100,
+        height: 100,
+        borderRadius: 50,
         justifyContent: 'center',
         alignItems: 'center',
+        elevation: 4,
     },
-    avatarText: { color: '#FFF', fontSize: 32, fontWeight: 'bold' },
-    name: { fontSize: 22, fontWeight: 'bold', marginTop: 10 },
-    role: { color: '#666', fontSize: 14, letterSpacing: 1 },
-    infoSection: {
-        backgroundColor: '#FFF',
+    avatarText: { color: '#FFF', fontSize: 40, fontWeight: 'bold' },
+    name: { fontSize: 26, fontWeight: 'bold', marginTop: 12 },
+    role: { fontSize: 14, letterSpacing: 1, marginTop: 4 },
+    infoCard: {
         borderRadius: 15,
         padding: 20,
+        marginBottom: 20,
+        elevation: 3,
         shadowColor: '#000',
         shadowOpacity: 0.05,
-        elevation: 2,
+        shadowRadius: 5,
     },
-    label: { color: '#999', fontSize: 12, marginBottom: 5 },
-    value: { fontSize: 16, fontWeight: '600', marginBottom: 15 },
-    divider: { height: 1, backgroundColor: '#EEE', marginBottom: 15 },
+    label: { fontSize: 12, marginBottom: 6 },
+    value: { fontSize: 18, fontWeight: '600' },
+    permission: { fontSize: 14, marginBottom: 4 },
     logoutBtn: {
-        marginTop: 'auto',
-        backgroundColor: '#FFEDED',
+        marginTop: 10,
         padding: 18,
         borderRadius: 12,
         alignItems: 'center',
+        elevation: 2,
     },
-    logoutText: { color: '#FF3B30', fontWeight: 'bold', fontSize: 16 },
+    logoutText: { fontWeight: 'bold', fontSize: 16 },
 })
-
-export default StaffProfileScreen
