@@ -1,155 +1,155 @@
-import React from 'react'
+import React, { useEffect, useMemo, useCallback } from 'react'
 import {
     ScrollView,
     StyleSheet,
     View,
-    Image,
-    Text,
-    TextInput,
-    TouchableOpacity,
+    SafeAreaView,
+    StatusBar,
+    ActivityIndicator,
+    RefreshControl,
 } from 'react-native'
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
-import { images } from '../constants'
-import ProductGrid from '../containers/Home/ProductGrid'
-import PromoBanner from '../containers/Home/PromoBanner'
-import OfferCarousel from '../containers/Home/OfferCarousel'
+import { useDispatch, useSelector } from 'react-redux'
 
-const Home = () => {
-    // Categories for quick navigation
-    const categories = [
-        { name: 'AC', icon: 'air-conditioner' },
-        { name: 'TV', icon: 'television' },
-        { name: 'Washing', icon: 'washing-machine' },
-        { name: 'Audio', icon: 'speaker-wireless' },
-        { name: 'Kitchen', icon: 'fridge' },
-    ]
+// Redux Actions
+import {
+    fetchActivePromotions,
+    fetchFeaturedPromotions,
+    fetchActiveBanners,
+    fetchFeaturedBanners,
+} from '../redux/features/Home/HomeSlice'
+import {
+    fetchDiscoverCoupons,
+    fetchActiveCoupons,
+} from '../redux/features/Coupons/CouponSlice'
+import { fetchPromotionsForUser } from '../redux/features/Promotion/PromotionSlice'
+
+// Components
+import Header from '../containers/Header'
+import PromotionCarousel from '../containers/Home/PromotionCarousel'
+import PromoBanner from '../containers/Home/PromoBanner'
+import CouponCarousel from '../containers/Home/CouponCarousel'
+import { COLORS } from '../constants'
+import ProductGrid from '../containers/Home/ProductGrid'
+
+const Home = ({ navigation }) => {
+    const dispatch = useDispatch()
+
+    // Selectors from all slices
+    const {
+        featuredPromotions,
+        activeBanners,
+        isLoading: homeLoading,
+    } = useSelector((state) => state.home)
+
+    // console.log('activeBanners', activeBanners)
+    const { activeCoupons, discoverCoupons, isCouponLoading } = useSelector(
+        (state) => state.coupon
+    )
+    const { promotions, isPromotionLoading } = useSelector(
+        (state) => state.promotions
+    )
+
+    const isGlobalLoading = homeLoading || isCouponLoading || isPromotionLoading
+
+    const loadAllData = useCallback(() => {
+        // Home Data
+        // dispatch(fetchfe())
+        dispatch(fetchActivePromotions())
+        dispatch(fetchFeaturedPromotions())
+        dispatch(fetchActiveBanners())
+        dispatch(fetchFeaturedBanners())
+        // Coupon Data
+        dispatch(fetchActiveCoupons())
+        dispatch(fetchDiscoverCoupons())
+        // User Promotions
+        dispatch(fetchPromotionsForUser())
+
+    }, [dispatch])
+
+    useEffect(() => {
+        loadAllData()
+    }, [loadAllData])
+
+    // Deduplicate Banner Data
+    const bannerData = useMemo(
+        () => [...(activeBanners || [])],
+        [activeBanners]
+    )
+
+    // Deduplicate Coupon Data
+    const uniqueCoupons = useMemo(() => {
+        const combined = [...(activeCoupons || []), ...(discoverCoupons || [])]
+        return Array.from(
+            new Map(combined.map((item) => [item._id, item])).values()
+        )
+    }, [activeCoupons, discoverCoupons])
+
+    if (
+        isGlobalLoading &&
+        bannerData.length === 0 &&
+        uniqueCoupons.length === 0
+    ) {
+        return (
+            <SafeAreaView style={styles.center}>
+                <ActivityIndicator
+                    size="large"
+                    color={COLORS.primary || '#1e3c72'}
+                />
+            </SafeAreaView>
+        )
+    }
 
     return (
-        <View style={styles.mainContainer}>
-            {/* 1. Custom Sticky Header */}
-            <View style={styles.header}>
-                <Image source={images.logo} style={styles.logo} />
-                <View style={styles.searchBar}>
-                    <MaterialCommunityIcons
-                        name="magnify"
-                        size={20}
-                        color="#888"
-                    />
-                    <TextInput
-                        placeholder="Search electronics..."
-                        style={styles.searchInput}
-                    />
-                </View>
-                <TouchableOpacity>
-                    <MaterialCommunityIcons
-                        name="cart-outline"
-                        size={28}
-                        color="#1e3c72"
-                    />
-                    <View style={styles.cartBadge}>
-                        <Text style={styles.badgeText}>2</Text>
-                    </View>
-                </TouchableOpacity>
-            </View>
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+            <Header />
 
             <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 30 }}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isGlobalLoading}
+                        onRefresh={loadAllData}
+                        colors={[COLORS.primary || '#1e3c72']}
+                    />
+                }
             >
-                {/* 2. Promo Cashback Banner */}
-                <PromoBanner data={promoData} />
+                {/* Section 1: Top Dynamic Promotions */}
+                <PromotionCarousel
+                    data={promotions}
+                    isLoading={isPromotionLoading}
+                />
 
-                {/* 3. Category Quick Links */}
-                <View style={styles.catSection}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                    >
-                        {categories.map((cat, i) => (
-                            <TouchableOpacity key={i} style={styles.catItem}>
-                                <View style={styles.catIcon}>
-                                    <MaterialCommunityIcons
-                                        name={cat.icon}
-                                        size={24}
-                                        color="#1e3c72"
-                                    />
-                                </View>
-                                <Text style={styles.catText}>{cat.name}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                </View>
+                {/* Section 2: Cashback Banners */}
+                <CouponCarousel
+                    data={uniqueCoupons}
+                    isLoading={isCouponLoading}
+                    onViewAll={() => navigation.navigate('Coupons')}
+                />
 
-                {/* 4. Seasonal Offers */}
-                <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>
-                        Exclusive Seasonal Offers
-                    </Text>
-                    <Text style={styles.viewAll}>View All</Text>
-                </View>
-                <OfferCarousel offers={offers} />
+                {/* Section 3: Exclusive Coupons */}
+                {bannerData.length > 0 && (
+                    <View style={styles.sectionMargin}>
+                        <PromoBanner data={bannerData} />
+                    </View>
+                )}
 
-                {/* 5. Trending Deals */}
                 <ProductGrid deals={deals} />
+                <View style={{ height: 40 }} />
             </ScrollView>
-        </View>
+        </SafeAreaView>
     )
 }
 
 const styles = StyleSheet.create({
-    mainContainer: { flex: 1, backgroundColor: '#f8f9fb' },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingTop: 50,
-        paddingBottom: 15,
-        paddingHorizontal: 15,
-        backgroundColor: '#fff',
-    },
-    logo: { width: 40, height: 40, resizeMode: 'contain' },
-    searchBar: {
+    container: { flex: 1, backgroundColor: '#FFFFFF' },
+    center: {
         flex: 1,
-        flexDirection: 'row',
-        backgroundColor: '#f0f2f5',
-        marginHorizontal: 15,
-        borderRadius: 10,
-        paddingHorizontal: 10,
-        alignItems: 'center',
-        height: 40,
-    },
-    searchInput: { flex: 1, marginLeft: 8, fontSize: 14 },
-    cartBadge: {
-        position: 'absolute',
-        right: -5,
-        top: -5,
-        backgroundColor: '#E91E63',
-        borderRadius: 10,
-        width: 18,
-        height: 18,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    badgeText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
-    catSection: { marginTop: 20, paddingLeft: 15 },
-    catItem: { alignItems: 'center', marginRight: 20 },
-    catIcon: {
-        width: 50,
-        height: 50,
         backgroundColor: '#fff',
-        borderRadius: 25,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 2,
     },
-    catText: { fontSize: 11, marginTop: 5, color: '#444', fontWeight: '600' },
-    sectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        marginTop: 10,
-    },
-    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#1A1A1A' },
-    viewAll: { color: '#1e3c72', fontWeight: 'bold' },
+    sectionMargin: { marginTop: 10 },
 })
 
 export default Home

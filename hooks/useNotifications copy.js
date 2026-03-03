@@ -16,25 +16,18 @@ import notifee, {
 } from '@notifee/react-native'
 import { useDispatch, useSelector } from 'react-redux'
 import { addNotification } from '../redux/features/Notifications/NotificationSlice'
+import AuthService from '../redux/features/Auth/AuthService'
+// import AuthService from '../../services/AuthService'
 
-// Import images at the top level
-const notificationIcon = require('../assets/icons/apple.png')
-const avatarIcon = require('../assets/icons/apple.png')
-
-// Function to display a local notification
 export const displayLocalNotification = async (remoteMessage) => {
-    // console.log('remoteMessage in console ', remoteMessage)
-
     const data = remoteMessage?.data || {}
     const notification = remoteMessage?.notification || {}
-
     const title = notification?.title || data?.title || '📢 MW FiberNet'
     const body =
         notification?.body || data?.message || 'You have a new notification'
     const image = data?.image || undefined
 
     try {
-        // Create/ensure channel exists with HIGH importance
         const channelId = await notifee.createChannel({
             id: 'high_priority',
             name: 'High Priority Alerts',
@@ -43,7 +36,6 @@ export const displayLocalNotification = async (remoteMessage) => {
             vibration: true,
         })
 
-        // Build config
         const notificationConfig = {
             title,
             body,
@@ -54,20 +46,13 @@ export const displayLocalNotification = async (remoteMessage) => {
                 priority: AndroidImportance.HIGH,
                 sound: 'default',
                 vibration: true,
-                pressAction: {
-                    id: 'default',
-                    launchActivity: 'default',
-                },
-                // 👇 this forces heads-up even in foreground
-                asForegroundService: false,
-                localOnly: false,
+                pressAction: { id: 'default', launchActivity: 'default' },
                 category: AndroidCategory.MESSAGE,
                 visibility: AndroidVisibility.PUBLIC,
             },
             ios: {
                 sound: 'default',
                 badge: 1,
-                // 👇 ensures foreground heads-up on iOS
                 foregroundPresentationOptions: {
                     alert: true,
                     badge: true,
@@ -89,73 +74,64 @@ export const displayLocalNotification = async (remoteMessage) => {
     }
 }
 
-export const useNotifications = () => {
+export const useNotifications = (isLoggedIn = false) => {
     const dispatch = useDispatch()
-    const { customer, isLoggedIn } = useSelector((state) => state.customer)
+    const { user } = useSelector((state) => state.auth)
     const initialHandled = useRef(false)
+    const tokenRefreshListener = useRef(null)
 
     useEffect(() => {
-        if (!isLoggedIn || !customer?._id) return
-
-        // console.log('🔔 Setting up notification listeners (modular API)...')
+        if (!isLoggedIn || !user?._id) return
 
         const app = getApp()
         const messaging = getMessaging(app)
 
-        // Foreground messages
         const unsubscribeForeground = onMessage(
             messaging,
             async (remoteMessage) => {
-                // console.log('📱 Foreground FCM Message:', remoteMessage)
                 await displayLocalNotification(remoteMessage)
-                if (remoteMessage?.data) {
+                if (remoteMessage?.data)
                     dispatch(addNotification(remoteMessage.data))
-                }
             }
         )
 
-        // Background notification tap
         const unsubscribeNotificationTap = onNotificationOpenedApp(
             messaging,
             (remoteMessage) => {
-                // console.log(
-                //     '📱 Notification opened from background:',
-                //     remoteMessage
-                // )
-                if (remoteMessage?.data) {
+                if (remoteMessage?.data)
                     dispatch(addNotification(remoteMessage.data))
-                }
             }
         )
 
-        // App opened from quit
         getInitialNotification(messaging).then((remoteMessage) => {
             if (remoteMessage && !initialHandled.current) {
-                console.log(
-                    '📲 App opened from quit via notification:',
-                    remoteMessage
-                )
                 initialHandled.current = true
-                if (remoteMessage?.data) {
+                if (remoteMessage?.data)
                     dispatch(addNotification(remoteMessage.data))
-                }
             }
         })
 
-        // Token refresh
-        const unsubscribeTokenRefresh = onTokenRefresh(
+        // Handle token refresh and update server
+        tokenRefreshListener.current = onTokenRefresh(
             messaging,
-            (newToken) => {
+            async (newToken) => {
                 console.log('🔄 FCM token refreshed:', newToken)
+                try {
+                    await AuthService.updateFCMToken()
+                } catch (error) {
+                    console.error('Failed to update FCM token:', error)
+                }
             }
         )
 
         return () => {
             unsubscribeForeground()
             unsubscribeNotificationTap()
-            unsubscribeTokenRefresh()
+            if (tokenRefreshListener.current) {
+                tokenRefreshListener.current()
+            }
         }
-    }, [dispatch, customer, isLoggedIn])
+    }, [dispatch, user, isLoggedIn])
 }
 
 export default useNotifications

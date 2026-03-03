@@ -10,7 +10,7 @@ import React, { useState, useRef } from 'react'
 import { COLORS, SIZES, icons, images } from '../constants'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ScrollView } from 'react-native-virtualized-view'
-import { MaterialIcons } from '@expo/vector-icons'
+import { MaterialIcons, Ionicons, Feather } from '@expo/vector-icons'
 import SettingsItem from '../components/SettingsItem'
 import { useTheme } from '../theme/ThemeProvider'
 import RBSheet from 'react-native-raw-bottom-sheet'
@@ -26,7 +26,6 @@ const Menu = ({ navigation }) => {
     const handleLogout = async () => {
         try {
             await dispatch(logout()).unwrap()
-            // refRBSheet.current.close()
         } catch (error) {
             console.error('Logout failed', error)
         }
@@ -46,7 +45,7 @@ const Menu = ({ navigation }) => {
                         { color: dark ? COLORS.white : COLORS.greyscale900 },
                     ]}
                 >
-                    Settings
+                    Menu
                 </Text>
             </View>
         </View>
@@ -82,7 +81,7 @@ const Menu = ({ navigation }) => {
                                 Nathalie Erneson
                             </Text>
                             <Text style={styles.viewProfileText}>
-                                Account Details & Activity
+                                View profile & account details
                             </Text>
                         </View>
                         <MaterialIcons
@@ -94,6 +93,33 @@ const Menu = ({ navigation }) => {
 
                     <View style={styles.sectionDivider} />
 
+                    {/* --- SHOPPING SECTION --- */}
+                    <Text style={styles.sectionLabel}>Shopping</Text>
+
+                    <SettingsItem
+                        icon={icons.document}
+                        name="All Products"
+                        onPress={() => navigation.navigate('AllProducts')}
+                    />
+                    <SettingsItem
+                        icon={icons.more}
+                        name="Categories"
+                        onPress={() => navigation.navigate('Categories')}
+                    />
+                    <SettingsItem
+                        icon={icons.calendar}
+                        name="My Orders"
+                        onPress={() => navigation.navigate('MyBookings')}
+                    />
+                    {/* <SettingsItem
+                        icon={icons.heart2}
+                        name="Wishlist"
+                        onPress={() => navigation.navigate('Search')} // Assuming search handles filters
+                    /> */}
+
+                    <View style={styles.sectionDivider} />
+
+                    {/* --- PREFERENCES SECTION --- */}
                     <Text style={styles.sectionLabel}>Preferences</Text>
                     <SettingsItem
                         icon={icons.bell2}
@@ -142,11 +168,19 @@ const Menu = ({ navigation }) => {
                         />
                     </View>
 
-                    <Text style={styles.sectionLabel}>Security & Legal</Text>
+                    <View style={styles.sectionDivider} />
+
+                    {/* --- SUPPORT & LEGAL --- */}
+                    <Text style={styles.sectionLabel}>Support & Legal</Text>
                     <SettingsItem
                         icon={icons.shieldOutline}
                         name="Security"
                         onPress={() => navigation.navigate('SettingsSecurity')}
+                    />
+                    <SettingsItem
+                        icon={icons.help}
+                        name="Help Center"
+                        onPress={() => navigation.navigate('HelpCenter')}
                     />
                     <SettingsItem
                         icon={icons.lockedComputerOutline}
@@ -167,9 +201,12 @@ const Menu = ({ navigation }) => {
                         />
                         <Text style={styles.simpleLogoutText}>Logout</Text>
                     </TouchableOpacity>
+
+                    <View style={{ height: 100 }} />
                 </ScrollView>
             </View>
 
+            {/* Logout Bottom Sheet */}
             <RBSheet
                 ref={refRBSheet}
                 closeOnDragDown={true}
@@ -247,10 +284,11 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingVertical: 12,
+        paddingHorizontal: 5,
     },
     leftRow: { flexDirection: 'row', alignItems: 'center' },
-    rowIcon: { width: 24, height: 24 },
-    rowLabel: { fontSize: 18, fontFamily: 'semiBold', marginLeft: 12 },
+    rowIcon: { width: 20, height: 20 },
+    rowLabel: { fontSize: 16, fontFamily: 'semiBold', marginLeft: 15 },
     simpleLogout: {
         flexDirection: 'row',
         alignItems: 'center',

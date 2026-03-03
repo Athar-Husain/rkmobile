@@ -1,5 +1,4 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-
 import ProductService from './ProductService'
 import { safeShowMessage } from '../Auth/AuthSlice'
 
@@ -9,8 +8,8 @@ import { safeShowMessage } from '../Auth/AuthSlice'
 const initialState = {
     products: [],
     featuredProducts: [],
-    // New state to hold dynamic category/subcategory mapping
     categoriesList: [],
+    categoriesMap: {},
     product: null,
     similarProducts: [],
     applicableCoupons: [],
@@ -18,14 +17,18 @@ const initialState = {
     comparison: null,
     filters: {},
     pagination: {},
-    isProductLoading: false,
+
+    // UI States
+    isLoading: false, // Global loader for basic products
+    isFetchingFeatured: false,
+    isFetchingCategories: false,
     isProductSuccess: false,
     isProductError: false,
     message: '',
 }
 
 // ================================
-// Helper
+// Helper: Error Handler
 // ================================
 const getErrorMessage = (error) =>
     error?.response?.data?.error ||
@@ -36,133 +39,94 @@ const getErrorMessage = (error) =>
 // ================================
 // Async Thunks
 // ================================
-
-// NEW: Fetch Categories List (Dynamic Category/Subcategory Mapping)
 export const fetchCategoriesList = createAsyncThunk(
     'product/fetchCategories',
-    async (_, thunkAPI) => {
+    async (_, { rejectWithValue }) => {
         try {
             return await ProductService.getCategoriesList()
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getErrorMessage(error))
+        } catch (e) {
+            return rejectWithValue(getErrorMessage(e))
         }
     }
 )
 
-// ... (Existing Thunks: fetchProducts, fetchFeaturedProducts, etc.)
 export const fetchProducts = createAsyncThunk(
     'product/fetchAll',
-    async (params, thunkAPI) => {
+    async (params, { rejectWithValue }) => {
         try {
             return await ProductService.getProducts(params)
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getErrorMessage(error))
+        } catch (e) {
+            return rejectWithValue(getErrorMessage(e))
         }
     }
 )
 
 export const fetchFeaturedProducts = createAsyncThunk(
     'product/fetchFeatured',
-    async (_, thunkAPI) => {
+    async (_, { rejectWithValue }) => {
         try {
             return await ProductService.getFeaturedProducts()
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getErrorMessage(error))
+        } catch (e) {
+            return rejectWithValue(getErrorMessage(e))
         }
     }
 )
 
 export const fetchProductsByCategory = createAsyncThunk(
     'product/fetchByCategory',
-    async ({ category, params }, thunkAPI) => {
+    async ({ category, params }, { rejectWithValue }) => {
         try {
             return await ProductService.getProductsByCategory(category, params)
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getErrorMessage(error))
+        } catch (e) {
+            return rejectWithValue(getErrorMessage(e))
         }
     }
 )
 
 export const addProduct = createAsyncThunk(
     'product/add',
-    async (data, thunkAPI) => {
+    async (data, { dispatch, rejectWithValue }) => {
         try {
             const response = await ProductService.addProduct(data)
-            // After adding a product, refresh categories to include potential new ones
-            thunkAPI.dispatch(fetchCategoriesList())
+            dispatch(fetchCategoriesList())
             return response
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getErrorMessage(error))
-        }
-    }
-)
-
-// ----------------
-// Search
-// ----------------
-export const searchProducts = createAsyncThunk(
-    'product/search',
-    async ({ query, params }, thunkAPI) => {
-        try {
-            return await ProductService.searchProducts(query, params)
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getErrorMessage(error))
-        }
-    }
-)
-
-// ----------------
-// Compare
-// ----------------
-export const compareProducts = createAsyncThunk(
-    'product/compare',
-    async (data, thunkAPI) => {
-        try {
-            return await ProductService.compareProducts(data)
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getErrorMessage(error))
-        }
-    }
-)
-
-// ----------------
-// Availability
-// ----------------
-export const checkProductAvailability = createAsyncThunk(
-    'product/checkAvailability',
-    async ({ id, params }, thunkAPI) => {
-        try {
-            return await ProductService.checkAvailability(id, params)
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getErrorMessage(error))
-        }
-    }
-)
-
-// ----------------
-// Product Details
-// ----------------
-export const fetchProductById = createAsyncThunk(
-    'product/fetchById',
-    async (id, thunkAPI) => {
-        try {
-            return await ProductService.getProductById(id)
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getErrorMessage(error))
+        } catch (e) {
+            return rejectWithValue(getErrorMessage(e))
         }
     }
 )
 
 export const updateProduct = createAsyncThunk(
     'product/update',
-    async ({ id, data }, thunkAPI) => {
+    async ({ id, data }, { dispatch, rejectWithValue }) => {
         try {
             const response = await ProductService.updateProduct(id, data)
-            // After updating, refresh categories list in case category was changed
-            thunkAPI.dispatch(fetchCategoriesList())
+            dispatch(fetchCategoriesList())
             return response
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getErrorMessage(error))
+        } catch (e) {
+            return rejectWithValue(getErrorMessage(e))
+        }
+    }
+)
+
+export const searchProducts = createAsyncThunk(
+    'product/search',
+    async ({ query, params }, { rejectWithValue }) => {
+        try {
+            return await ProductService.searchProducts(query, params)
+        } catch (e) {
+            return rejectWithValue(getErrorMessage(e))
+        }
+    }
+)
+
+export const fetchProductById = createAsyncThunk(
+    'product/fetchById',
+    async (id, { rejectWithValue }) => {
+        try {
+            return await ProductService.getProductById(id)
+        } catch (e) {
+            return rejectWithValue(getErrorMessage(e))
         }
     }
 )
@@ -175,7 +139,6 @@ const productSlice = createSlice({
     initialState,
     reducers: {
         RESET_PRODUCT_STATE: (state) => {
-            state.isProductLoading = false
             state.isProductSuccess = false
             state.isProductError = false
             state.message = ''
@@ -189,18 +152,17 @@ const productSlice = createSlice({
     },
     extraReducers: (builder) => {
         builder
-            // ----------------
-            // Categories List
-            // ----------------
+            // ---------------- Specific Success Cases ----------------
             .addCase(fetchCategoriesList.fulfilled, (state, action) => {
-                // action.payload.data is the array: [{ category: 'mob-dhi', subcategories: [...] }]
+                state.isFetchingCategories = false
                 state.categoriesList = action.payload.data
+                state.categoriesMap = action.payload.data.reduce((acc, cat) => {
+                    acc[cat.category] = cat
+                    return acc
+                }, {})
             })
-
-            // ----------------
-            // Listings
-            // ----------------
             .addCase(fetchProducts.fulfilled, (state, action) => {
+                state.isLoading = false
                 state.products = action.payload.products
                 state.filters = action.payload.filters
                 state.pagination = {
@@ -208,112 +170,60 @@ const productSlice = createSlice({
                     pages: action.payload.pages,
                     currentPage: action.payload.currentPage,
                 }
-            })
-
-            // ----------------
-            // Add Product
-            // ----------------
-            .addCase(addProduct.fulfilled, (state, action) => {
-                state.products.unshift(action.payload.product) // Add to top of list
-                state.isProductSuccess = true
-                state.message = action.payload.message
-                // toast.success(action.payload.message)
-                safeShowMessage({
-                    message: action.payload.message,
-                    type: 'success',
-                })
-            })
-
-            // ----------------
-            // Update Product
-            // ----------------
-            .addCase(updateProduct.fulfilled, (state, action) => {
-                const index = state.products.findIndex(
-                    (p) => p._id === action.payload.product._id
-                )
-                if (index !== -1) state.products[index] = action.payload.product
-                state.isProductSuccess = true
-                state.message = action.payload.message
-                // toast.success(action.payload.message)
-                safeShowMessage({
-                    message: action.payload.message,
-                    type: 'success',
-                })
             })
             .addCase(fetchFeaturedProducts.fulfilled, (state, action) => {
+                state.isFetchingFeatured = false
                 state.featuredProducts = action.payload.products
             })
-            .addCase(fetchProductsByCategory.fulfilled, (state, action) => {
-                state.products = action.payload.products
-                state.filters = action.payload.filters
-                state.pagination = {
-                    total: action.payload.total,
-                    pages: action.payload.pages,
-                    currentPage: action.payload.currentPage,
-                }
+            .addCase(addProduct.fulfilled, (state, action) => {
+                state.isLoading = false
+                state.products.unshift(action.payload.product)
+                state.isProductSuccess = true
             })
-
-            // ----------------
-            // Product Detail
-            // ----------------
+            .addCase(updateProduct.fulfilled, (state, action) => {
+                state.isLoading = false
+                const idx = state.products.findIndex(
+                    (p) => p._id === action.payload.product._id
+                )
+                if (idx !== -1) state.products[idx] = action.payload.product
+                state.isProductSuccess = true
+            })
             .addCase(fetchProductById.fulfilled, (state, action) => {
+                state.isLoading = false
                 state.product = action.payload.product
                 state.similarProducts = action.payload.similarProducts
                 state.applicableCoupons = action.payload.applicableCoupons
             })
 
-            // ----------------
-            // Search
-            // ----------------
-            .addCase(searchProducts.fulfilled, (state, action) => {
-                state.products = action.payload.products
-                state.pagination = {
-                    total: action.payload.total,
-                    pages: action.payload.pages,
-                    currentPage: action.payload.currentPage,
-                }
-            })
-
-            // ----------------
-            // Availability
-            // ----------------
-            .addCase(checkProductAvailability.fulfilled, (state, action) => {
-                state.availability = action.payload
-            })
-
-            // ----------------
-            // Compare
-            // ----------------
-            .addCase(compareProducts.fulfilled, (state, action) => {
-                state.comparison = action.payload
-            })
-
-            // ... (Keep other existing cases)
-
-            // ----------------
-            // Global Matchers
-            // ----------------
+            // ---------------- Matchers (Global Handlers) ----------------
+            // Matches any pending product action
             .addMatcher(
-                (action) => action.type.endsWith('/pending'),
-                (state) => {
-                    state.isProductLoading = true
+                (action) =>
+                    action.type.startsWith('product/') &&
+                    action.type.endsWith('/pending'),
+                (state, action) => {
                     state.isProductError = false
                     state.message = ''
+
+                    // Set specific flags based on thunk type
+                    if (action.type.includes('fetchFeatured'))
+                        state.isFetchingFeatured = true
+                    else if (action.type.includes('fetchCategories'))
+                        state.isFetchingCategories = true
+                    else state.isLoading = true
                 }
             )
+            // Matches any rejected product action
             .addMatcher(
-                (action) => action.type.endsWith('/fulfilled'),
-                (state) => {
-                    state.isProductLoading = false
-                }
-            )
-            .addMatcher(
-                (action) => action.type.endsWith('/rejected'),
+                (action) =>
+                    action.type.startsWith('product/') &&
+                    action.type.endsWith('/rejected'),
                 (state, action) => {
-                    state.isProductLoading = false
+                    state.isLoading = false
+                    state.isFetchingFeatured = false
+                    state.isFetchingCategories = false
                     state.isProductError = true
                     state.message = action.payload
-                    // toast.error(action.payload)
                     safeShowMessage({ message: action.payload, type: 'danger' })
                 }
             )

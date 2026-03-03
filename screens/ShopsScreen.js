@@ -12,26 +12,21 @@ import {
     ActivityIndicator,
     SafeAreaView,
     RefreshControl,
+    StatusBar,
 } from 'react-native'
 import { useSelector, useDispatch } from 'react-redux'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { fetchStores } from '../redux/features/Stores/StoreSlice'
 
 const { width } = Dimensions.get('window')
-
-// 🔐 Replace with env/config
 const MAPBOX_TOKEN = 'YOUR_MAPBOX_TOKEN'
 
 const ShopsScreen = () => {
     const dispatch = useDispatch()
     const { stores, isStoreLoading } = useSelector((state) => state.store)
-
     const [selectedShop, setSelectedShop] = useState(null)
     const [refreshing, setRefreshing] = useState(false)
 
-    // ========================
-    // Fetch stores
-    // ========================
     const loadStores = useCallback(() => {
         dispatch(fetchStores())
     }, [dispatch])
@@ -46,20 +41,14 @@ const ShopsScreen = () => {
         }
     }, [stores])
 
-    // ========================
-    // Helpers
-    // ========================
     const openNativeMap = () => {
         if (!selectedShop) return
-
         const { lat, lng, name } = selectedShop
         const latLng = `${lat},${lng}`
-
         const url = Platform.select({
             ios: `maps:0,0?q=${name}@${latLng}`,
             android: `geo:0,0?q=${latLng}(${name})`,
         })
-
         Linking.openURL(url)
     }
 
@@ -70,48 +59,42 @@ const ShopsScreen = () => {
     const formatTimings = (timings) => {
         if (!timings || typeof timings !== 'object')
             return 'Hours not available'
-
         const { open, close, workingDays } = timings
-
         const days =
             Array.isArray(workingDays) && workingDays.length > 0
                 ? workingDays.join(', ')
                 : 'All days'
-
-        if (open && close) {
-            return `${open} - ${close} (${days})`
-        }
-
-        return 'Hours not available'
+        return open && close
+            ? `${open} - ${close} (${days})`
+            : 'Hours not available'
     }
 
-    // ========================
-    // Render Shop Card
-    // ========================
     const renderShopCard = ({ item }) => {
         const isActive = selectedShop?._id === item._id
 
         return (
             <TouchableOpacity
-                activeOpacity={0.85}
+                activeOpacity={0.7}
                 onPress={() => setSelectedShop(item)}
                 style={[styles.card, isActive && styles.cardActive]}
             >
                 <View
                     style={[
                         styles.iconBox,
-                        { backgroundColor: isActive ? '#004AAD' : '#F1F5FF' },
+                        { backgroundColor: isActive ? '#004AAD' : '#F0F4FF' },
                     ]}
                 >
                     <MaterialCommunityIcons
-                        name="storefront"
+                        name={isActive ? 'storefront' : 'storefront-outline'}
                         size={24}
                         color={isActive ? '#FFF' : '#004AAD'}
                     />
                 </View>
 
                 <View style={{ flex: 1 }}>
-                    <Text style={styles.shopType}>{item.type || 'STORE'}</Text>
+                    <Text style={styles.shopType}>
+                        {item.type || 'RETAIL STORE'}
+                    </Text>
                     <Text style={styles.shopName}>{item.name}</Text>
                     <Text style={styles.shopAddress} numberOfLines={1}>
                         {item.address}
@@ -123,7 +106,7 @@ const ShopsScreen = () => {
                     style={styles.callBtn}
                 >
                     <MaterialCommunityIcons
-                        name="phone"
+                        name="phone-in-talk"
                         size={20}
                         color="#004AAD"
                     />
@@ -132,9 +115,6 @@ const ShopsScreen = () => {
         )
     }
 
-    // ========================
-    // Loading
-    // ========================
     if (isStoreLoading && stores.length === 0) {
         return (
             <View style={styles.center}>
@@ -145,157 +125,159 @@ const ShopsScreen = () => {
 
     return (
         <SafeAreaView style={styles.container}>
-            {/* Header */}
+            <StatusBar barStyle="dark-content" />
             <View style={styles.header}>
-                <Text style={styles.title}>Our Presence</Text>
+                <Text style={styles.title}>Find a Store</Text>
                 <Text style={styles.subtitle}>
-                    Visit us for exclusive deals
+                    Visit us to experience products in person
                 </Text>
             </View>
 
-            {/* Map */}
             {selectedShop && (
-                <TouchableOpacity
-                    activeOpacity={0.9}
-                    style={styles.mapCard}
-                    onPress={openNativeMap}
-                >
-                    <Image
-                        style={styles.mapImage}
-                        source={{
-                            uri: `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s+004AAD(${selectedShop.lng},${selectedShop.lat})/${selectedShop.lng},${selectedShop.lat},14/${Math.round(
-                                width
-                            )}x240?access_token=${MAPBOX_TOKEN}`,
-                        }}
-                    />
+                <View style={styles.mapWrapper}>
+                    <TouchableOpacity
+                        activeOpacity={0.95}
+                        style={styles.mapCard}
+                        onPress={openNativeMap}
+                    >
+                        <Image
+                            style={styles.mapImage}
+                            source={{
+                                uri: `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s+004AAD(${selectedShop.lng},${selectedShop.lat})/${selectedShop.lng},${selectedShop.lat},14/${Math.round(width)}x240?access_token=${MAPBOX_TOKEN}`,
+                            }}
+                        />
+                        {/* Soft Gradient Overlay for text readability */}
+                        <View style={styles.mapOverlayGradient} />
 
-                    <View style={styles.mapInfo}>
-                        <Text style={styles.mapShopName}>
-                            {selectedShop.name}
-                        </Text>
-                        <Text style={styles.mapHours}>
-                            {formatTimings(selectedShop.timings)}
-                        </Text>
-                    </View>
-                </TouchableOpacity>
+                        <View style={styles.mapInfo}>
+                            <Text style={styles.mapShopName}>
+                                {selectedShop.name}
+                            </Text>
+                            <View style={styles.timingRow}>
+                                <MaterialCommunityIcons
+                                    name="clock-outline"
+                                    size={14}
+                                    color="#666"
+                                />
+                                <Text style={styles.mapHours}>
+                                    {formatTimings(selectedShop.timings)}
+                                </Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.directionsBadge}>
+                            <MaterialCommunityIcons
+                                name="directions"
+                                size={18}
+                                color="#FFF"
+                            />
+                            <Text style={styles.directionsText}>
+                                Directions
+                            </Text>
+                        </View>
+                    </TouchableOpacity>
+                </View>
             )}
 
-            {/* List */}
             <FlatList
                 data={stores}
                 renderItem={renderShopCard}
                 keyExtractor={(item) => item._id}
                 showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.listContent}
                 refreshControl={
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={() => {
                             setRefreshing(true)
                             loadStores()
-                            setTimeout(() => setRefreshing(false), 800)
+                            setTimeout(() => setRefreshing(false), 1000)
                         }}
+                        tintColor="#004AAD"
                     />
                 }
                 ListHeaderComponent={
-                    <Text style={styles.listTitle}>Select a Location</Text>
+                    <Text style={styles.listTitle}>Available Locations</Text>
                 }
-                contentContainerStyle={styles.listContent}
             />
         </SafeAreaView>
     )
 }
 
-// export default ShopsScreen
-
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8F9FB' },
-
+    container: { flex: 1, backgroundColor: '#F5F7FA' },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
-    header: {
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 15,
-    },
+    header: { paddingHorizontal: 22, paddingVertical: 20 },
     title: {
-        fontSize: 22,
-        fontWeight: '800',
+        fontSize: 28,
+        fontWeight: '900',
         color: '#1A1A1A',
+        letterSpacing: -0.5,
     },
-    subtitle: {
-        fontSize: 14,
-        color: '#7C7C7C',
-        marginTop: 4,
-    },
+    subtitle: { fontSize: 15, color: '#666', marginTop: 4 },
 
+    mapWrapper: { paddingHorizontal: 20, marginBottom: 10 },
     mapCard: {
-        marginHorizontal: 20,
-        marginBottom: 15,
-        height: 240,
-        borderRadius: 26,
+        height: 220,
+        borderRadius: 24,
         overflow: 'hidden',
-        elevation: 10,
-        backgroundColor: '#E5ECFF',
+        backgroundColor: '#FFF',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 10 },
+                shadowOpacity: 0.1,
+                shadowRadius: 10,
+            },
+            android: { elevation: 8 },
+        }),
     },
     mapImage: { width: '100%', height: '100%' },
-
-    mapOverlay: {
+    mapOverlayGradient: {
         ...StyleSheet.absoluteFillObject,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255,255,255,0.05)',
+        backgroundColor: 'rgba(255,255,255,0.1)', // Subtle tint
     },
-
     mapInfo: {
         position: 'absolute',
-        top: 12,
-        left: 12,
+        bottom: 15,
+        left: 15,
         backgroundColor: '#FFF',
-        padding: 10,
-        borderRadius: 14,
-        elevation: 6,
-        width: '70%',
+        padding: 12,
+        borderRadius: 16,
+        width: '65%',
+        elevation: 5,
     },
+    mapShopName: { fontSize: 16, fontWeight: 'bold', color: '#1A1A1A' },
+    timingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+    mapHours: { fontSize: 11, color: '#666', marginLeft: 4 },
 
-    openBadge: {
+    directionsBadge: {
+        position: 'absolute',
+        bottom: 15,
+        right: 15,
+        backgroundColor: '#004AAD',
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 4,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        borderRadius: 12,
+        elevation: 5,
     },
-    greenDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#4CAF50',
-        marginRight: 6,
-    },
-    openText: {
-        fontSize: 10,
-        fontWeight: '800',
-        color: '#4CAF50',
-        letterSpacing: 0.6,
-    },
-
-    mapShopName: {
-        fontSize: 14,
-        fontWeight: '800',
-        color: '#1A1A1A',
-    },
-    mapHours: {
-        fontSize: 11,
-        color: '#777',
-        marginTop: 2,
-    },
-
-    listContent: {
-        paddingHorizontal: 20,
-        paddingBottom: 30,
-    },
-    listTitle: {
+    directionsText: {
+        color: '#FFF',
+        fontWeight: 'bold',
         fontSize: 12,
+        marginLeft: 5,
+    },
+
+    listContent: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 },
+    listTitle: {
+        fontSize: 13,
         fontWeight: '800',
-        color: '#444',
-        marginBottom: 12,
+        color: '#888',
+        textTransform: 'uppercase',
+        marginBottom: 15,
+        letterSpacing: 1,
     },
 
     card: {
@@ -303,59 +285,52 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         backgroundColor: '#FFF',
         padding: 16,
-        borderRadius: 22,
+        borderRadius: 20,
         marginBottom: 12,
-        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#E1E8EE',
     },
     cardActive: {
-        borderWidth: 1.5,
         borderColor: '#004AAD',
+        backgroundColor: '#F9FBFF',
+        ...Platform.select({
+            ios: {
+                shadowColor: '#004AAD',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+            },
+            android: { elevation: 4 },
+        }),
     },
-
     iconBox: {
-        width: 48,
-        height: 48,
+        width: 52,
+        height: 52,
         borderRadius: 16,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 14,
+        marginRight: 15,
     },
-
     shopType: {
         fontSize: 10,
-        fontWeight: '800',
+        fontWeight: '900',
         color: '#004AAD',
-        textTransform: 'uppercase',
+        letterSpacing: 1,
     },
     shopName: {
-        fontSize: 15,
+        fontSize: 17,
         fontWeight: '700',
         color: '#1A1A1A',
+        marginTop: 1,
     },
-    shopAddress: {
-        fontSize: 12,
-        color: '#888',
-        marginTop: 2,
-    },
-
+    shopAddress: { fontSize: 13, color: '#777', marginTop: 3 },
     callBtn: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#F1F5FF',
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        backgroundColor: '#F0F4FF',
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 10,
-    },
-
-    empty: {
-        alignItems: 'center',
-        marginTop: 80,
-    },
-    emptyText: {
-        marginTop: 10,
-        color: '#AAA',
-        fontSize: 14,
     },
 })
 

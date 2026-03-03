@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 
 // Create axios instance
 const api = axios.create({
-    baseURL: 'http://YOUR_API_URL/api',
+    baseURL: 'http://10.0.2.2:5000/api', // Use 10.0.2.2 for Android emulator to access localhost
     timeout: 10000,
     headers: {
         'Content-Type': 'application/json',

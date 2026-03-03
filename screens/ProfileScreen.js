@@ -14,8 +14,12 @@ import {
     FlatList,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useNavigation } from '@react-navigation/native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useDispatch, useSelector } from 'react-redux'
+import {
+    getProfile,
+    updateProfile,
+    logout,
+} from '../redux/features/Auth/AuthSlice'
 import * as ImagePicker from 'expo-image-picker'
 
 // Components
@@ -54,49 +58,43 @@ const ProfileScreen = () => {
         emailNotifications: true,
     })
 
+    const dispatch = useDispatch()
+    const { user: reduxUser } = useSelector((state) => state.auth)
+
     // Load user data
     useEffect(() => {
-        loadUserData()
+        dispatch(getProfile())
         fetchCities()
-    }, [])
+    }, [dispatch])
 
-    const loadUserData = async () => {
-        try {
-            setLoading(true)
-            const userString = await AsyncStorage.getItem('user')
-            if (userString) {
-                const userData = JSON.parse(userString)
-                setUser(userData)
-                setName(userData.name)
-                setProfileImage(userData.profileImage)
+    useEffect(() => {
+        if (reduxUser) {
+            setUser(reduxUser)
+            setName(reduxUser.name || '')
+            setProfileImage(reduxUser.profileImage || '')
 
-                // Load preferences
-                if (userData.preferences) {
-                    setPreferences(userData.preferences)
-                }
-
-                // Load city and area
-                if (userData.city) {
-                    setSelectedCity({
-                        id: userData.city,
-                        name: userData.cityName || 'City',
-                    })
-                    fetchAreas(userData.city)
-                }
-                if (userData.area) {
-                    setSelectedArea({
-                        id: userData.area,
-                        name: userData.areaName || 'Area',
-                    })
-                }
+            if (reduxUser.preferences) {
+                setPreferences(reduxUser.preferences)
             }
-        } catch (error) {
-            console.error('Failed to load user data:', error)
-            Alert.alert('Error', 'Failed to load profile')
-        } finally {
+
+            if (reduxUser.city) {
+                setSelectedCity({
+                    id: reduxUser.city,
+                    name: reduxUser.cityName || 'City',
+                })
+                fetchAreas(reduxUser.city)
+            }
+            if (reduxUser.area) {
+                setSelectedArea({
+                    id: reduxUser.area,
+                    name: reduxUser.areaName || 'Area',
+                })
+            }
             setLoading(false)
         }
-    }
+    }, [reduxUser])
+
+    // Removed redundant loadUserData because we are using getProfile Redux thunk above.
 
     const fetchCities = async () => {
         try {
@@ -151,73 +149,36 @@ const ProfileScreen = () => {
         }
     }
 
-    const handleUpdateProfile = async () => {
+    const handleUpdateProfile = () => {
         if (!name.trim()) {
             Alert.alert('Error', 'Name is required')
             return
         }
 
         setUpdating(true)
-        try {
-            const updateData = {
-                name: name.trim(),
-                preferences,
-            }
-
-            const response = await api.patch('/auth/profile', updateData)
-
-            if (response.data.success) {
-                // Update local storage
-                const updatedUser = { ...user, ...response.data.user }
-                await AsyncStorage.setItem('user', JSON.stringify(updatedUser))
-                setUser(updatedUser)
-
-                setEditMode(false)
-                Alert.alert('Success', 'Profile updated successfully')
-            } else {
-                Alert.alert(
-                    'Error',
-                    response.data.message || 'Failed to update profile'
-                )
-            }
-        } catch (error) {
-            console.error('Update profile error:', error)
-            Alert.alert(
-                'Error',
-                error.response?.data?.message || 'Failed to update profile'
-            )
-        } finally {
-            setUpdating(false)
+        const updateData = {
+            name: name.trim(),
+            preferences,
+            city: selectedCity?.id,
+            area: selectedArea?.id,
         }
+
+        dispatch(updateProfile(updateData)).then((res) => {
+            setUpdating(false)
+            if (res.meta.requestStatus === 'fulfilled') {
+                setEditMode(false)
+            }
+        })
     }
 
-    const handleLogout = async () => {
+    const handleLogout = () => {
         Alert.alert('Logout', 'Are you sure you want to logout?', [
             { text: 'Cancel', style: 'cancel' },
             {
                 text: 'Logout',
                 style: 'destructive',
-                onPress: async () => {
-                    try {
-                        await api.post('/auth/logout')
-
-                        // Clear storage
-                        await AsyncStorage.clear()
-
-                        // Navigate to auth stack
-                        navigation.reset({
-                            index: 0,
-                            routes: [{ name: 'AuthStack' }],
-                        })
-                    } catch (error) {
-                        console.error('Logout error:', error)
-                        // Still logout locally even if API fails
-                        await AsyncStorage.clear()
-                        navigation.reset({
-                            index: 0,
-                            routes: [{ name: 'AuthStack' }],
-                        })
-                    }
+                onPress: () => {
+                    dispatch(logout())
                 },
             },
         ])

@@ -46,6 +46,11 @@ import {
     Profile,
 } from '../screens'
 
+// Import New E-commerce Screens
+import CategoriesScreen from '../screens/CategoriesScreen'
+import AllProducts from '../screens/AllProducts'
+import ProductDetails from '../screens/ProductDetails'
+
 import SupportTicketDetail from '../screens/SupportTicketDetail'
 import PlansScreen from '../screens/Plans'
 import ConnectionsScreen from '../screens/Connections'
@@ -68,6 +73,15 @@ const MainStack = () => {
 
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="MainTabs" component={BottomTabNavigation} />
+
+                {/* New E-commerce Stack Screens */}
+                <Stack.Screen name="Categories" component={CategoriesScreen} />
+                <Stack.Screen name="AllProducts" component={AllProducts} />
+                <Stack.Screen
+                    name="ProductDetails"
+                    component={ProductDetails}
+                />
+
                 <Stack.Screen name="EditProfile" component={EditProfile} />
                 <Stack.Screen name="Profile" component={Profile} />
                 <Stack.Screen name="Menu" component={Menu} />

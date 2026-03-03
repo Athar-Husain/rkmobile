@@ -1,4 +1,3 @@
-// hooks/useNortifications.js
 import { useEffect, useRef } from 'react'
 import { getApp } from '@react-native-firebase/app'
 import {
@@ -10,49 +9,45 @@ import {
 } from '@react-native-firebase/messaging'
 import notifee, {
     AndroidImportance,
-    AndroidCategory,
     AndroidVisibility,
     AndroidStyle,
 } from '@notifee/react-native'
 import { useDispatch, useSelector } from 'react-redux'
 import { addNotification } from '../redux/features/Notifications/NotificationSlice'
 import AuthService from '../redux/features/Auth/AuthService'
-// import AuthService from '../../services/AuthService'
 
+/**
+ * Manually displays a notification using Notifee.
+ * This is the ONLY place a notification is visually rendered.
+ */
 export const displayLocalNotification = async (remoteMessage) => {
-    const data = remoteMessage?.data || {}
-    const notification = remoteMessage?.notification || {}
-    const title = notification?.title || data?.title || '📢 MW FiberNet'
-    const body =
-        notification?.body || data?.message || 'You have a new notification'
-    const image = data?.image || undefined
+    const { data } = remoteMessage
+    if (!data) return
+
+    const title = data.title || '📢 RK Electronics'
+    const body = data.body || 'You have a new update'
+    const image = data.image && data.image !== 'undefined' ? data.image : null
 
     try {
         const channelId = await notifee.createChannel({
             id: 'high_priority',
             name: 'High Priority Alerts',
             importance: AndroidImportance.HIGH,
+            visibility: AndroidVisibility.PUBLIC,
             sound: 'default',
-            vibration: true,
         })
 
         const notificationConfig = {
             title,
             body,
-            data,
+            data: data, // Attach data so it's available when the user taps
             android: {
                 channelId,
                 importance: AndroidImportance.HIGH,
-                priority: AndroidImportance.HIGH,
-                sound: 'default',
-                vibration: true,
+                priority: 'high',
                 pressAction: { id: 'default', launchActivity: 'default' },
-                category: AndroidCategory.MESSAGE,
-                visibility: AndroidVisibility.PUBLIC,
             },
             ios: {
-                sound: 'default',
-                badge: 1,
                 foregroundPresentationOptions: {
                     alert: true,
                     badge: true,
@@ -70,7 +65,7 @@ export const displayLocalNotification = async (remoteMessage) => {
 
         await notifee.displayNotification(notificationConfig)
     } catch (err) {
-        console.error('❌ Failed to display notification:', err?.message || err)
+        console.error('❌ Notifee Display Error:', err)
     }
 }
 
@@ -78,14 +73,13 @@ export const useNotifications = (isLoggedIn = false) => {
     const dispatch = useDispatch()
     const { user } = useSelector((state) => state.auth)
     const initialHandled = useRef(false)
-    const tokenRefreshListener = useRef(null)
 
     useEffect(() => {
         if (!isLoggedIn || !user?._id) return
 
-        const app = getApp()
-        const messaging = getMessaging(app)
+        const messaging = getMessaging(getApp())
 
+        // FOREGROUND: Always trigger Notifee manual display
         const unsubscribeForeground = onMessage(
             messaging,
             async (remoteMessage) => {
@@ -95,6 +89,7 @@ export const useNotifications = (isLoggedIn = false) => {
             }
         )
 
+        // BACKGROUND TAP: Handle user clicking notification when app is in background
         const unsubscribeNotificationTap = onNotificationOpenedApp(
             messaging,
             (remoteMessage) => {
@@ -103,6 +98,7 @@ export const useNotifications = (isLoggedIn = false) => {
             }
         )
 
+        // KILLED STATE TAP: Handle user clicking notification when app was closed
         getInitialNotification(messaging).then((remoteMessage) => {
             if (remoteMessage && !initialHandled.current) {
                 initialHandled.current = true
@@ -111,13 +107,11 @@ export const useNotifications = (isLoggedIn = false) => {
             }
         })
 
-        // Handle token refresh and update server
-        tokenRefreshListener.current = onTokenRefresh(
+        const unsubscribeTokenRefresh = onTokenRefresh(
             messaging,
             async (newToken) => {
-                console.log('🔄 FCM token refreshed:', newToken)
                 try {
-                    await AuthService.updateFCMToken()
+                    await AuthService.updateFCMToken(newToken)
                 } catch (error) {
                     console.error('Failed to update FCM token:', error)
                 }
@@ -127,9 +121,7 @@ export const useNotifications = (isLoggedIn = false) => {
         return () => {
             unsubscribeForeground()
             unsubscribeNotificationTap()
-            if (tokenRefreshListener.current) {
-                tokenRefreshListener.current()
-            }
+            unsubscribeTokenRefresh()
         }
     }, [dispatch, user, isLoggedIn])
 }

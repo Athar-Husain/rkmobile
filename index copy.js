@@ -1,82 +1,63 @@
 // index.js
 import { registerRootComponent } from 'expo'
-import messaging from '@react-native-firebase/messaging'
-// import notifee, { EventType } from '@notifee/react-native'
-import notifee, {
-    AndroidImportance,
-    AndroidStyle, // you’re using this too
-    AndroidCategory,
-    EventType,
-    AndroidVisibility, // you’re using this too
-} from '@notifee/react-native'
+import { getApps, getApp, initializeApp } from '@react-native-firebase/app'
+import {
+    getMessaging,
+    setBackgroundMessageHandler,
+} from '@react-native-firebase/messaging'
+import notifee, { AndroidImportance, EventType } from '@notifee/react-native'
 import App from './App'
 import { displayLocalNotification } from './hooks/useNotifications'
-// import { displayLocalNotification } from './hooks/useNotifications'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
-// ==========================================
-// 1. CREATE NOTIFICATION CHANNELS FIRST
-// ==========================================
+// =====================
+// 1. SAFE FIREBASE APP INIT
+// =====================
+const firebaseApp = getApps().length ? getApp() : initializeApp()
+
+// =====================
+// 2. CREATE NOTIFICATION CHANNELS
+// =====================
 const createNotificationChannels = async () => {
     try {
         await notifee.createChannel({
             id: 'high_priority',
             name: 'High Priority Alerts',
-            importance: notifee.AndroidImportance.HIGH,
+            importance: AndroidImportance.HIGH,
             sound: 'default',
             vibration: true,
         })
-
         await notifee.createChannel({
             id: 'default',
             name: 'Default Notifications',
-            importance: notifee.AndroidImportance.DEFAULT,
+            importance: AndroidImportance.DEFAULT,
             sound: 'default',
+            vibration: true,
         })
-
-        // console.log('✅ Notification channels created')
-    } catch (error) {
-        console.error('❌ Failed to create channels:', error)
+        console.log('✅ Notification channels created')
+    } catch (err) {
+        console.error('❌ Failed to create channels:', err)
     }
 }
-
-// Create channels immediately
 createNotificationChannels()
 
-// ==========================================
-// 2. FIREBASE BACKGROUND MESSAGE HANDLER
-// ==========================================
-// This handles incoming messages when app is backgrounded (NOT killed)
-messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-    console.log('📩 Background Message received:', remoteMessage)
-
-    // Only display if it's a data-only message
-    // Firebase automatically shows notification messages in background
-    if (remoteMessage.data && !remoteMessage.notification) {
-        await displayLocalNotification(remoteMessage)
-    }
+// =====================
+// 3. FIREBASE BACKGROUND MESSAGES
+// =====================
+const messaging = getMessaging(firebaseApp)
+setBackgroundMessageHandler(messaging, async (remoteMessage) => {
+    console.log('📩 Background message received:', remoteMessage)
+    await displayLocalNotification(remoteMessage).catch(console.error)
 })
 
-// ==========================================
-// 3. NOTIFEE BACKGROUND EVENT HANDLER
-// ==========================================
-// This handles user interactions with notifications in background/killed state
+// =====================
+// 4. NOTIFEE BACKGROUND EVENTS
+// =====================
 notifee.onBackgroundEvent(async ({ type, detail }) => {
-    console.log('📱 Notifee Background Event:', type, detail)
-
     const { notification, pressAction } = detail
-
     switch (type) {
         case EventType.PRESS:
-            console.log(
-                '🔔 Notification pressed in background/killed:',
-                notification
-            )
-
-            // Store the notification data for when app opens
-            // You can use AsyncStorage or any storage solution
             try {
-                const AsyncStorage =
-                    require('@react-native-async-storage/async-storage').default
                 await AsyncStorage.setItem(
                     'lastNotificationPress',
                     JSON.stringify({
@@ -85,30 +66,20 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
                         timestamp: Date.now(),
                     })
                 )
-            } catch (error) {
-                console.error('Failed to store notification data:', error)
+            } catch (err) {
+                console.error('❌ Failed to save notification press:', err)
             }
             break
-
         case EventType.DISMISSED:
-            console.log('🔔 Notification dismissed in background')
-            break
-
         case EventType.ACTION_PRESS:
-            console.log('🔔 Action pressed in background:', pressAction)
-            // Handle specific action presses
-            break
-
         case EventType.DELIVERED:
-            console.log('🔔 Notification delivered in background')
             break
-
         default:
             console.log('🔔 Unknown background event:', type)
     }
 })
 
-// ==========================================
-// 4. REGISTER APP
-// ==========================================
+// =====================
+// 5. REGISTER APP
+// =====================
 registerRootComponent(App)

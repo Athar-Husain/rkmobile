@@ -1,59 +1,38 @@
-// utils/requestNotificationPermission
 import { Platform } from 'react-native'
 import messaging from '@react-native-firebase/messaging'
 import notifee, { AuthorizationStatus } from '@notifee/react-native'
 
 export const requestNotificationPermission = async () => {
     try {
-        console.log('🔔 Requesting notification permission...')
-
-        /* =========================
-       ANDROID 13+ (API 33+)
-    ========================= */
-        if (Platform.OS === 'android' && Platform.Version >= 33) {
+        if (Platform.OS === 'android') {
+            // Android 13+ requires explicit POST_NOTIFICATIONS permission
             const settings = await notifee.requestPermission()
-
-            console.log(
-                '📱 Android permission status:',
-                settings.authorizationStatus
-            )
-
             if (settings.authorizationStatus < AuthorizationStatus.AUTHORIZED) {
-                console.warn('❌ Android notifications denied')
+                console.warn('❌ Android Notifications Denied')
                 return false
-            }
-
-            if (settings.authorizationStatus === AuthorizationStatus.DENIED) {
-                console.warn('❌ User explicitly denied notifications')
             }
         }
 
-        /* =========================
-       iOS PERMISSION
-    ========================= */
         if (Platform.OS === 'ios') {
             const authStatus = await messaging().requestPermission({
                 alert: true,
                 badge: true,
                 sound: true,
             })
-
             const enabled =
                 authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
                 authStatus === messaging.AuthorizationStatus.PROVISIONAL
 
-            console.log('🍎 iOS permission enabled:', enabled)
-
             if (!enabled) {
-                console.warn('❌ iOS notifications denied')
+                console.warn('❌ iOS Notifications Denied')
                 return false
             }
         }
 
-        console.log('✅ Notification permission granted')
+        console.log('✅ All Notification Permissions Granted')
         return true
     } catch (error) {
-        console.error('🔥 Permission request failed:', error)
+        console.error('🔥 Permission Request Error:', error)
         return false
     }
 }

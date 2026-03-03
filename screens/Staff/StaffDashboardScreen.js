@@ -1,5 +1,3 @@
-// StaffDashboardScreen.js
-
 import React, { useEffect, useState } from 'react'
 import {
     View,
@@ -8,200 +6,379 @@ import {
     StyleSheet,
     TouchableOpacity,
     Dimensions,
+    StatusBar,
+    SafeAreaView,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useSelector } from 'react-redux'
+import Feather from 'react-native-vector-icons/Feather'
 import { COLORS } from '../../constants'
 import { useTheme } from '../../theme/ThemeProvider'
 
 const { width } = Dimensions.get('window')
-const scale = (size) => (width / 375) * size
-
-// Dummy stats (replace later with API/Redux data)
-const dummyStats = {
-    todaySales: 15230,
-    totalOrders: 18,
-    activeCoupons: 3,
-    customersServed: 12,
-}
 
 const StaffDashboardScreen = () => {
     const navigation = useNavigation()
     const { dark, colors } = useTheme()
-    const [stats, setStats] = useState(dummyStats)
-
     const { user } = useSelector((state) => state.auth)
 
-    useEffect(() => {
-        // Future API call example:
-        // dispatch(fetchStaffStats())
-    }, [])
+    // Layout Constants
+    const CARD_WIDTH = (width - 52) / 2 // Perfect padding for 2-column grid
 
     return (
-        <ScrollView
+        <SafeAreaView
             style={[styles.container, { backgroundColor: colors.background }]}
-            contentContainerStyle={{ paddingBottom: scale(40) }}
-            showsVerticalScrollIndicator={false}
         >
-            {/* Welcome Title */}
-            <Text
-                style={[
-                    styles.title,
-                    { color: dark ? COLORS.white : COLORS.greyscale900 },
-                ]}
+            <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
+
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
             >
-                Welcome Back, {user?.name?.split(' ')[0] || 'Staff'}!
-            </Text>
-
-            {/* Quick Actions */}
-            <View style={styles.actionsContainer}>
-                <TouchableOpacity
-                    style={[
-                        styles.actionCard,
-                        { backgroundColor: COLORS.primary },
-                    ]}
-                    activeOpacity={0.8}
-                    onPress={() => navigation.navigate('StaffPOS')}
-                >
-                    <Text style={styles.actionText}>Start POS Billing</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.actionCard, { backgroundColor: '#FF7F50' }]}
-                    activeOpacity={0.8}
-                    onPress={() => navigation.navigate('StaffScanner')}
-                >
-                    <Text style={styles.actionText}>Scan Coupon</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={[styles.actionCard, { backgroundColor: '#4CAF50' }]}
-                    activeOpacity={0.8}
-                    onPress={() => navigation.navigate('StaffProfile')}
-                >
-                    <Text style={styles.actionText}>Profile</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Stats Section */}
-            <Text
-                style={[
-                    styles.sectionTitle,
-                    { color: dark ? COLORS.white : COLORS.greyscale900 },
-                ]}
-            >
-                Today's Stats
-            </Text>
-
-            <View style={styles.statsContainer}>
-                {Object.entries(stats).map(([key, value]) => (
-                    <View
-                        key={key}
-                        style={[
-                            styles.statCard,
-                            {
-                                backgroundColor: dark
-                                    ? COLORS.dark2
-                                    : COLORS.white,
-                            },
-                        ]}
-                    >
+                {/* Header Section */}
+                <View style={styles.header}>
+                    <View>
                         <Text
                             style={[
-                                styles.statLabel,
+                                styles.greeting,
                                 {
                                     color: dark
-                                        ? COLORS.greyscale400
+                                        ? COLORS.greyscale300
                                         : COLORS.greyscale600,
                                 },
                             ]}
                         >
-                            {key === 'todaySales'
-                                ? 'Sales'
-                                : key === 'totalOrders'
-                                  ? 'Orders'
-                                  : key === 'activeCoupons'
-                                    ? 'Active Coupons'
-                                    : 'Customers'}
+                            Good Morning,
                         </Text>
-
                         <Text
                             style={[
-                                styles.statValue,
-                                { color: COLORS.primary },
+                                styles.userName,
+                                {
+                                    color: dark
+                                        ? COLORS.white
+                                        : COLORS.greyscale900,
+                                },
                             ]}
                         >
-                            {key === 'todaySales' ? `₹${value}` : value}
+                            {user?.name?.split(' ')[0] || 'Staff Member'}
                         </Text>
                     </View>
-                ))}
-            </View>
-        </ScrollView>
+                    <TouchableOpacity
+                        style={[
+                            styles.notifBadge,
+                            {
+                                backgroundColor: dark
+                                    ? COLORS.dark3
+                                    : '#F1F5F9',
+                            },
+                        ]}
+                    >
+                        <Feather
+                            name="bell"
+                            size={20}
+                            color={dark ? COLORS.white : COLORS.greyscale900}
+                        />
+                        <View style={styles.dot} />
+                    </TouchableOpacity>
+                </View>
+
+                {/* Primary Action Card (High Focus) */}
+                <TouchableOpacity
+                    style={styles.mainActionCard}
+                    activeOpacity={0.9}
+                    onPress={() => navigation.navigate('StaffPOS')}
+                >
+                    <View style={styles.mainActionContent}>
+                        <View>
+                            <Text style={styles.mainActionTitle}>
+                                Create New Sale
+                            </Text>
+                            <Text style={styles.mainActionSub}>
+                                Tap to start POS billing
+                            </Text>
+                        </View>
+                        <View style={styles.mainActionIcon}>
+                            <Feather
+                                name="plus"
+                                size={24}
+                                color={COLORS.primary}
+                            />
+                        </View>
+                    </View>
+                </TouchableOpacity>
+
+                {/* Quick Navigation Grid */}
+                <Text
+                    style={[
+                        styles.sectionTitle,
+                        { color: dark ? COLORS.white : COLORS.greyscale900 },
+                    ]}
+                >
+                    Quick Actions
+                </Text>
+                <View style={styles.grid}>
+                    <QuickLink
+                        title="Scan Coupon"
+                        icon="maximize"
+                        color="#6366F1"
+                        onPress={() => navigation.navigate('StaffScanner')}
+                        dark={dark}
+                    />
+                    <QuickLink
+                        title="Orders"
+                        icon="file-text"
+                        color="#F59E0B"
+                        onPress={() => navigation.navigate('StaffOrders')}
+                        dark={dark}
+                    />
+                    <QuickLink
+                        title="Customers"
+                        icon="users"
+                        color="#10B981"
+                        onPress={() => {}}
+                        dark={dark}
+                    />
+                    <QuickLink
+                        title="My Profile"
+                        icon="settings"
+                        color="#64748B"
+                        onPress={() => navigation.navigate('StaffProfile')}
+                        dark={dark}
+                    />
+                </View>
+
+                {/* Stats Section */}
+                <View style={styles.statsHeader}>
+                    <Text
+                        style={[
+                            styles.sectionTitle,
+                            {
+                                color: dark
+                                    ? COLORS.white
+                                    : COLORS.greyscale900,
+                            },
+                        ]}
+                    >
+                        Performance
+                    </Text>
+                    <Text style={styles.dateLabel}>Today</Text>
+                </View>
+
+                <View
+                    style={[
+                        styles.statsWrapper,
+                        { backgroundColor: dark ? COLORS.dark2 : '#F8FAFC' },
+                    ]}
+                >
+                    <StatRow
+                        label="Today's Revenue"
+                        value="₹15,230"
+                        icon="trending-up"
+                        trend="+12%"
+                    />
+                    <View style={styles.statDivider} />
+                    <View style={styles.statGrid}>
+                        <MiniStat label="Orders" value="18" />
+                        <MiniStat label="Customers" value="12" />
+                        <MiniStat label="Coupons" value="03" />
+                    </View>
+                </View>
+            </ScrollView>
+        </SafeAreaView>
     )
 }
+
+// Sub-component for clean links
+const QuickLink = ({ title, icon, color, onPress, dark }) => (
+    <TouchableOpacity
+        style={[
+            styles.linkCard,
+            { backgroundColor: dark ? COLORS.dark2 : COLORS.white },
+        ]}
+        onPress={onPress}
+    >
+        <View style={[styles.linkIconBg, { backgroundColor: `${color}15` }]}>
+            <Feather name={icon} size={22} color={color} />
+        </View>
+        <Text
+            style={[
+                styles.linkText,
+                { color: dark ? COLORS.white : COLORS.greyscale800 },
+            ]}
+        >
+            {title}
+        </Text>
+    </TouchableOpacity>
+)
+
+// Sub-component for mini stats
+const MiniStat = ({ label, value }) => (
+    <View style={styles.miniStat}>
+        <Text style={styles.miniStatValue}>{value}</Text>
+        <Text style={styles.miniStatLabel}>{label}</Text>
+    </View>
+)
+
+// Sub-component for Revenue Row
+const StatRow = ({ label, value, icon, trend }) => (
+    <View style={styles.statRow}>
+        <View style={styles.statRowLeft}>
+            <Text style={styles.statRowLabel}>{label}</Text>
+            <Text style={styles.statRowValue}>{value}</Text>
+        </View>
+        <View style={styles.trendBadge}>
+            <Feather name={icon} size={12} color="#10B981" />
+            <Text style={styles.trendText}>{trend}</Text>
+        </View>
+    </View>
+)
 
 export default StaffDashboardScreen
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        padding: scale(20),
-    },
-    title: {
-        fontSize: scale(24),
-        fontFamily: 'bold',
-        marginBottom: scale(20),
-    },
-    actionsContainer: {
+    container: { flex: 1 },
+    scrollContent: { padding: 20, paddingBottom: 40 },
+
+    // Header
+    header: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
         justifyContent: 'space-between',
-        marginBottom: scale(30),
+        alignItems: 'center',
+        marginBottom: 25,
     },
-    actionCard: {
-        width: '48%',
-        padding: scale(20),
-        borderRadius: scale(14),
+    greeting: { fontSize: 14, fontWeight: '500' },
+    userName: { fontSize: 22, fontWeight: '800', letterSpacing: -0.5 },
+    notifBadge: {
+        width: 44,
+        height: 44,
+        borderRadius: 12,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: scale(12),
-        shadowColor: '#000',
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 5,
     },
-    actionText: {
-        color: '#fff',
-        fontFamily: 'semiBold',
-        fontSize: scale(16),
-        textAlign: 'center',
+    dot: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#EF4444',
+        borderWidth: 2,
+        borderColor: '#FFF',
     },
-    sectionTitle: {
-        fontSize: scale(20),
-        fontFamily: 'bold',
-        marginBottom: scale(12),
+
+    // Main Action
+    mainActionCard: {
+        backgroundColor: COLORS.primary,
+        borderRadius: 20,
+        padding: 20,
+        marginBottom: 25,
+        elevation: 8,
+        shadowColor: COLORS.primary,
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
     },
-    statsContainer: {
+    mainActionContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    mainActionTitle: { color: '#FFF', fontSize: 18, fontWeight: '700' },
+    mainActionSub: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 13,
+        marginTop: 2,
+    },
+    mainActionIcon: {
+        width: 44,
+        height: 44,
+        backgroundColor: '#FFF',
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+
+    // Grid
+    sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 15 },
+    grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'space-between',
+        marginBottom: 25,
     },
-    statCard: {
+    linkCard: {
         width: '48%',
-        padding: scale(18),
-        borderRadius: scale(14),
-        marginBottom: scale(12),
+        padding: 16,
+        borderRadius: 16,
+        marginBottom: 15,
+        alignItems: 'flex-start',
+        elevation: 2,
         shadowColor: '#000',
-        shadowOpacity: 0.08,
-        shadowRadius: 10,
-        elevation: 3,
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
     },
-    statLabel: {
-        fontSize: scale(14),
-        marginBottom: scale(8),
+    linkIconBg: {
+        width: 40,
+        height: 40,
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
     },
-    statValue: {
-        fontSize: scale(20),
-        fontFamily: 'bold',
+    linkText: { fontSize: 14, fontWeight: '600' },
+
+    // Stats
+    statsHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
     },
+    dateLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: COLORS.primary,
+        backgroundColor: '#E0E7FF',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    statsWrapper: { borderRadius: 20, padding: 20 },
+    statRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    statRowLabel: {
+        fontSize: 12,
+        color: '#64748B',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+    },
+    statRowValue: {
+        fontSize: 26,
+        fontWeight: '800',
+        color: '#0F172A',
+        marginTop: 4,
+    },
+    trendBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#ECFDF5',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 8,
+    },
+    trendText: {
+        color: '#10B981',
+        fontSize: 12,
+        fontWeight: '700',
+        marginLeft: 4,
+    },
+    statDivider: { height: 1, backgroundColor: '#E2E8F0', marginVertical: 20 },
+    statGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+    miniStat: { alignItems: 'flex-start' },
+    miniStatValue: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
+    miniStatLabel: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
 })

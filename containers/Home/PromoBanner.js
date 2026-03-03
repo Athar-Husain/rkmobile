@@ -1,201 +1,246 @@
-import React, { useState, useRef, useEffect } from 'react'
-import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native'
-import PagerView from 'react-native-pager-view'
+import React, { useState, useEffect, useRef } from 'react'
+import {
+    View,
+    Text,
+    StyleSheet,
+    FlatList,
+    Dimensions,
+    TouchableOpacity,
+    ImageBackground,
+} from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 
+const { width } = Dimensions.get('window')
+const CARD_WIDTH = width * 0.75
+const CARD_MARGIN = 12
+const FULL_STEP = CARD_WIDTH + CARD_MARGIN
+
 const PromoBanner = ({ data }) => {
-    const [currentPage, setCurrentPage] = useState(0)
-    const pagerRef = useRef(null)
+    const [currentIndex, setCurrentIndex] = useState(0)
+    const flatListRef = useRef(null)
+    const timerRef = useRef(null)
 
+    // Auto-slide logic (10 seconds)
     useEffect(() => {
-        if (data && data.length > 1) {
-            const interval = setInterval(() => {
-                const nextPage =
-                    currentPage === data.length - 1 ? 0 : currentPage + 1
-                pagerRef.current?.setPage(nextPage)
-            }, 4000)
-            return () => clearInterval(interval)
-        }
-    }, [currentPage, data])
+        startAutoSlide()
+        return () => stopAutoSlide() // Cleanup on unmount
+    }, [currentIndex, data])
 
-    if (!data || data.length === 0) return null
+    const startAutoSlide = () => {
+        stopAutoSlide()
+        timerRef.current = setInterval(() => {
+            if (data && data.length > 0) {
+                const nextIndex = (currentIndex + 1) % data.length
+                flatListRef.current?.scrollToOffset({
+                    offset: nextIndex * FULL_STEP,
+                    animated: true,
+                })
+            }
+        }, 10000) // 10 seconds
+    }
 
-    const renderCard = (item) => {
-        switch (item.type) {
-            case 'COUPON':
-                return (
-                    <LinearGradient
-                        colors={['#ff9966', '#ff5e62']}
-                        style={styles.card}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                    >
-                        <View style={styles.info}>
-                            <Text style={styles.label}>AVAILABLE COUPON</Text>
-                            <Text style={styles.amount}>
-                                ₹{item.amount} OFF
-                            </Text>
-                            <Text style={styles.subText}>
-                                Code: {item.code}
-                            </Text>
-                            <TouchableOpacity style={styles.btn}>
-                                <Text
-                                    style={[
-                                        styles.btnText,
-                                        { color: '#ff5e62' },
-                                    ]}
-                                >
-                                    Claim Coupon
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                        <Image source={item.image} style={styles.img} />
-                    </LinearGradient>
-                )
-            case 'PROMO':
-                return (
-                    <LinearGradient
-                        colors={['#00b09b', '#96c93d']}
-                        style={styles.card}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                    >
-                        <View style={styles.info}>
-                            <Text style={styles.label}>
-                                PROMOTIONAL CONNECT
-                            </Text>
-                            <Text
-                                style={[styles.amount, { fontSize: 24 }]}
-                                numberOfLines={2}
-                            >
-                                {item.title}
-                            </Text>
-                            <TouchableOpacity style={styles.btn}>
-                                <Text
-                                    style={[
-                                        styles.btnText,
-                                        { color: '#00b09b' },
-                                    ]}
-                                >
-                                    Check Details
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                        <Image source={item.image} style={styles.img} />
-                    </LinearGradient>
-                )
-            default: // CASHBACK style
-                return (
-                    <LinearGradient
-                        colors={['#1e3c72', '#2a5298']}
-                        style={styles.card}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                    >
-                        <View style={styles.info}>
-                            <Text style={styles.label}>CASHBACK EARNED</Text>
-                            <Text style={styles.amount}>₹{item.amount}</Text>
-                            <TouchableOpacity style={styles.btn}>
-                                <Text
-                                    style={[
-                                        styles.btnText,
-                                        { color: '#1e3c72' },
-                                    ]}
-                                >
-                                    Redeem to Wallet
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-                        <Image source={item.image} style={styles.img} />
-                    </LinearGradient>
-                )
+    const stopAutoSlide = () => {
+        if (timerRef.current) clearInterval(timerRef.current)
+    }
+
+    const onScroll = (event) => {
+        const slideSize = event.nativeEvent.layoutMeasurement.width
+        const index = event.nativeEvent.contentOffset.x / FULL_STEP
+        const roundIndex = Math.round(index)
+        if (roundIndex !== currentIndex) {
+            setCurrentIndex(roundIndex)
         }
     }
 
+    const renderItem = ({ item }) => {
+        return (
+            <TouchableOpacity activeOpacity={0.95} style={styles.cardContainer}>
+                <ImageBackground
+                    source={{ uri: item.imageUrl }}
+                    style={styles.backgroundImage}
+                    imageStyle={styles.imageRadius}
+                >
+                    <LinearGradient
+                        colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.7)']}
+                        style={styles.gradientOverlay}
+                    >
+                        <View style={styles.content}>
+                            <View>
+                                {item.description && (
+                                    <Text style={styles.label}>
+                                        {item.description.toUpperCase()}
+                                    </Text>
+                                )}
+                                <Text style={styles.title} numberOfLines={2}>
+                                    {item.title}
+                                </Text>
+                            </View>
+
+                            <View style={styles.footer}>
+                                <TouchableOpacity style={styles.shopBtn}>
+                                    <Text style={styles.shopText}>
+                                        Shop Now
+                                    </Text>
+                                </TouchableOpacity>
+
+                                {item.imageAlt ? (
+                                    <Text style={styles.altText}>
+                                        {item.imageAlt}
+                                    </Text>
+                                ) : null}
+                            </View>
+                        </View>
+                    </LinearGradient>
+                </ImageBackground>
+            </TouchableOpacity>
+        )
+    }
+
     return (
-        <View style={styles.wrapper}>
-            <PagerView
-                style={styles.pager}
-                initialPage={0}
-                ref={pagerRef}
-                onPageSelected={(e) => setCurrentPage(e.nativeEvent.position)}
-            >
-                {data.map((item, index) => (
-                    <View key={item.id || index} style={styles.page}>
-                        {renderCard(item)}
-                    </View>
-                ))}
-            </PagerView>
-            <View style={styles.dots}>
-                {data.map((_, i) => (
-                    <View
-                        key={i}
-                        style={[
-                            styles.dot,
-                            {
-                                opacity: i === currentPage ? 1 : 0.3,
-                                width: i === currentPage ? 15 : 6,
-                            },
-                        ]}
-                    />
-                ))}
+        <View style={styles.container}>
+            <View style={styles.headerRow}>
+                <Text style={styles.sectionTitle}>Trending Offers</Text>
+
+                {/* Pagination Dots */}
+                <View style={styles.dotContainer}>
+                    {data?.map((_, index) => (
+                        <View
+                            key={index}
+                            style={[
+                                styles.dot,
+                                currentIndex === index
+                                    ? styles.activeDot
+                                    : styles.inactiveDot,
+                            ]}
+                        />
+                    ))}
+                </View>
             </View>
+
+            <FlatList
+                ref={flatListRef}
+                data={data}
+                renderItem={renderItem}
+                keyExtractor={(item) => item._id}
+                horizontal
+                onScroll={onScroll}
+                scrollEventThrottle={16}
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={FULL_STEP}
+                decelerationRate="fast"
+                contentContainerStyle={styles.listPadding}
+                onScrollBeginDrag={stopAutoSlide} // Pause auto-slide when user touches
+                onScrollEndDrag={startAutoSlide} // Resume when they let go
+            />
         </View>
     )
 }
 
 const styles = StyleSheet.create({
-    wrapper: { height: 190, marginTop: 15 },
-    pager: { flex: 1 },
-    page: { paddingHorizontal: 15 },
-    card: {
-        flex: 1,
-        borderRadius: 20,
+    container: {
+        marginVertical: 10,
+    },
+    headerRow: {
+        paddingHorizontal: 20,
+        marginBottom: 12,
         flexDirection: 'row',
-        padding: 20,
+        justifyContent: 'space-between',
         alignItems: 'center',
-        elevation: 4,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.2,
-        shadowRadius: 4,
     },
-    info: { flex: 1, justifyContent: 'center' },
-    label: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 10,
-        fontWeight: 'bold',
-        letterSpacing: 1.2,
-        marginBottom: 4,
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: '800',
+        color: '#1a1a1a',
+        letterSpacing: 0.5,
     },
-    amount: {
-        color: '#fff',
-        fontSize: 30,
-        fontWeight: 'bold',
+    dotContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
     },
-    subText: {
-        color: '#fff',
-        fontSize: 14,
-        fontWeight: '600',
-        fontStyle: 'italic',
-        marginVertical: 4,
-    },
-    btn: {
-        backgroundColor: '#fff',
-        paddingVertical: 6,
-        paddingHorizontal: 15,
-        borderRadius: 20,
-        alignSelf: 'flex-start',
-        marginTop: 8,
-    },
-    btnText: { fontWeight: 'bold', fontSize: 12 },
-    img: { width: 90, height: 90, resizeMode: 'contain' },
-    dots: { flexDirection: 'row', justifyContent: 'center', marginTop: 10 },
     dot: {
         height: 6,
         borderRadius: 3,
-        backgroundColor: '#1e3c72',
         marginHorizontal: 3,
+    },
+    activeDot: {
+        width: 16,
+        backgroundColor: '#000',
+    },
+    inactiveDot: {
+        width: 6,
+        backgroundColor: '#ccc',
+    },
+    listPadding: {
+        paddingLeft: 20,
+        paddingRight: 20,
+    },
+    cardContainer: {
+        width: CARD_WIDTH,
+        height: 120, // Increased height slightly for better aspect ratio
+        marginRight: CARD_MARGIN,
+        borderRadius: 20,
+        backgroundColor: '#f0f0f0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 6,
+    },
+    backgroundImage: {
+        flex: 1,
+        width: '100%',
+        height: '100%',
+    },
+    imageRadius: {
+        borderRadius: 20,
+    },
+    gradientOverlay: {
+        flex: 1,
+        borderRadius: 20,
+        padding: 20,
+        justifyContent: 'flex-end',
+    },
+    content: {
+        flex: 1,
+        justifyContent: 'space-between',
+    },
+    label: {
+        color: '#fff',
+        fontSize: 10,
+        fontWeight: 'bold',
+        letterSpacing: 2,
+        marginBottom: 4,
+        opacity: 0.8,
+    },
+    title: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        color: '#fff',
+        lineHeight: 28,
+        textShadowColor: 'rgba(0, 0, 0, 0.3)',
+        textShadowOffset: { width: 0, height: 1 },
+        textShadowRadius: 4,
+    },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    shopBtn: {
+        backgroundColor: '#fff',
+        paddingVertical: 8,
+        paddingHorizontal: 18,
+        borderRadius: 30,
+    },
+    shopText: {
+        color: '#000',
+        fontWeight: '800',
+        fontSize: 13,
+    },
+    altText: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 12,
+        fontStyle: 'italic',
     },
 })
 

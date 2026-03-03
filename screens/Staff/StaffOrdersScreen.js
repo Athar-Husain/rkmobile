@@ -1,6 +1,4 @@
-// screens/staff/StaffOrdersScreen.js
-
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import {
     View,
     Text,
@@ -8,93 +6,137 @@ import {
     StyleSheet,
     TouchableOpacity,
     RefreshControl,
-    Dimensions,
+    TextInput,
+    StatusBar,
+    Platform,
 } from 'react-native'
 import { useDispatch, useSelector } from 'react-redux'
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
+import Feather from 'react-native-vector-icons/Feather' // Using Feather for a cleaner look
 import moment from 'moment'
 import { getMyRecordedPurchases } from '../../redux/features/Purchases/PurchaseSlice'
 import StaffOrderDetailsModal from './StaffOrderDetailsModal.js'
 
-const { height } = Dimensions.get('window')
+const OrderCard = React.memo(({ item, onPress }) => (
+    <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.6}
+        onPress={() => onPress(item)}
+    >
+        <View style={styles.cardContent}>
+            <View style={styles.leftColumn}>
+                <Text style={styles.invoiceText}>{item.invoiceNumber}</Text>
+                <Text style={styles.dateText}>
+                    {moment(item.createdAt).format('MMM DD, YYYY • HH:mm')}
+                </Text>
+            </View>
+
+            <View style={styles.rightColumn}>
+                <Text style={styles.amountText}>
+                    ₹
+                    {item.finalAmount?.toLocaleString('en-IN', {
+                        minimumFractionDigits: 2,
+                    })}
+                </Text>
+                <View style={styles.statusContainer}>
+                    <View style={styles.statusDot} />
+                    <Text style={styles.statusLabel}>Completed</Text>
+                </View>
+            </View>
+        </View>
+    </TouchableOpacity>
+))
 
 const StaffOrdersScreen = () => {
     const dispatch = useDispatch()
     const { myrecordedpurchases, isPurchaseLoading } = useSelector(
         (state) => state.purchase
     )
-
     const [selectedOrder, setSelectedOrder] = useState(null)
+    const [search, setSearch] = useState('')
 
     useEffect(() => {
         dispatch(getMyRecordedPurchases())
     }, [dispatch])
 
-    const renderOrderItem = ({ item }) => (
-        <TouchableOpacity
-            style={styles.card}
-            activeOpacity={0.9}
-            onPress={() => setSelectedOrder(item)}
-        >
-            <View style={styles.headerRow}>
-                <View>
-                    <Text style={styles.invoice}>
-                        {item.invoiceNumber}
-                    </Text>
-                    <Text style={styles.date}>
-                        {moment(item.createdAt).format(
-                            'DD MMM YYYY • hh:mm A'
-                        )}
-                    </Text>
-                </View>
+    const stats = useMemo(() => {
+        const total = myrecordedpurchases?.reduce(
+            (acc, curr) => acc + (curr.finalAmount || 0),
+            0
+        )
+        return {
+            count: myrecordedpurchases?.length || 0,
+            amount: total?.toLocaleString('en-IN') || '0',
+        }
+    }, [myrecordedpurchases])
 
-                <Text style={styles.amount}>
-                    ₹{item.finalAmount?.toLocaleString('en-IN')}
-                </Text>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.footerRow}>
-                <Text style={styles.itemCount}>
-                    {item.items.length} item(s)
-                </Text>
-
-                <View style={styles.statusBadge}>
-                    <Text style={styles.statusText}>
-                        {item.payment?.status || 'PAID'}
-                    </Text>
-                </View>
-            </View>
-        </TouchableOpacity>
-    )
+    const filteredData = useMemo(() => {
+        return myrecordedpurchases?.filter((o) =>
+            o.invoiceNumber.toLowerCase().includes(search.toLowerCase())
+        )
+    }, [search, myrecordedpurchases])
 
     return (
         <View style={styles.container}>
-            <Text style={styles.title}>Sales History</Text>
+            <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+
+            {/* Header Section */}
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.screenTitle}>Activity</Text>
+                    <Text style={styles.screenSubtitle}>
+                        Manage and track your sales
+                    </Text>
+                </View>
+                <TouchableOpacity style={styles.profileCircle}>
+                    <Feather name="user" size={20} color="#64748B" />
+                </TouchableOpacity>
+            </View>
+
+            {/* Micro Stats Bar */}
+            <View style={styles.statsBar}>
+                <View style={styles.statItem}>
+                    <Text style={styles.statValue}>{stats.count}</Text>
+                    <Text style={styles.statLabelHeader}>Transactions</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                    <Text style={styles.statValue}>₹{stats.amount}</Text>
+                    <Text style={styles.statLabelHeader}>Net Volume</Text>
+                </View>
+            </View>
+
+            {/* Minimal Search */}
+            <View style={styles.searchWrapper}>
+                <Feather name="search" size={16} color="#94A3B8" />
+                <TextInput
+                    placeholder="Search transactions..."
+                    placeholderTextColor="#94A3B8"
+                    style={styles.searchField}
+                    value={search}
+                    onChangeText={setSearch}
+                />
+            </View>
 
             <FlatList
-                data={myrecordedpurchases}
-                renderItem={renderOrderItem}
+                data={filteredData}
+                renderItem={({ item }) => (
+                    <OrderCard item={item} onPress={setSelectedOrder} />
+                )}
                 keyExtractor={(item) => item._id}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl
                         refreshing={isPurchaseLoading}
-                        onRefresh={() =>
-                            dispatch(getMyRecordedPurchases())
-                        }
+                        onRefresh={() => dispatch(getMyRecordedPurchases())}
                     />
                 }
                 ListEmptyComponent={
                     !isPurchaseLoading && (
                         <View style={styles.emptyState}>
-                            <MaterialCommunityIcons
-                                name="receipt"
-                                size={80}
-                                color="#CBD5E1"
-                            />
+                            <Feather name="inbox" size={40} color="#E2E8F0" />
                             <Text style={styles.emptyText}>
-                                No sales recorded yet
+                                No results found
                             </Text>
                         </View>
                     )
@@ -110,71 +152,112 @@ const StaffOrdersScreen = () => {
     )
 }
 
-export default StaffOrdersScreen
-
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8FAFC', padding: 16 },
-    title: {
-        fontSize: 26,
-        fontWeight: '800',
+    container: { flex: 1, backgroundColor: '#FFFFFF' },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: Platform.OS === 'ios' ? 20 : 10,
+        marginBottom: 15,
+    },
+    screenTitle: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#0F172A',
+        letterSpacing: -0.5,
+    },
+    screenSubtitle: { fontSize: 13, color: '#64748B', marginTop: 2 },
+    profileCircle: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#F8FAFC',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWeight: 1,
+        borderColor: '#F1F5F9',
+    },
+
+    // Stats Bar
+    statsBar: {
+        flexDirection: 'row',
+        marginHorizontal: 20,
+        paddingVertical: 15,
+        backgroundColor: '#F8FAFC',
+        borderRadius: 12,
         marginBottom: 20,
-        marginTop: 50,
+        alignItems: 'center',
     },
-    card: {
-        backgroundColor: '#FFF',
-        padding: 18,
-        borderRadius: 18,
-        marginBottom: 16,
-        elevation: 2,
-    },
-    headerRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-    },
-    invoice: {
-        fontSize: 16,
-        fontWeight: '700',
-        color: '#1E293B',
-    },
-    date: {
-        fontSize: 12,
+    statItem: { flex: 1, alignItems: 'center' },
+    statDivider: { width: 1, height: '60%', backgroundColor: '#E2E8F0' },
+    statValue: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
+    statLabelHeader: {
+        fontSize: 11,
         color: '#64748B',
-        marginTop: 4,
+        fontWeight: '500',
+        marginTop: 2,
+        textTransform: 'uppercase',
     },
-    amount: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: '#004AAD',
+
+    // Search
+    searchWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginHorizontal: 20,
+        paddingHorizontal: 15,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 10,
+        height: 40,
+        marginBottom: 15,
     },
-    divider: {
-        height: 1,
-        backgroundColor: '#E2E8F0',
-        marginVertical: 14,
+    searchField: { flex: 1, marginLeft: 10, fontSize: 14, color: '#1E293B' },
+
+    // Modern Card
+    listContent: { paddingHorizontal: 20, paddingBottom: 30 },
+    card: {
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9', // Line-based separation looks more professional than cards
     },
-    footerRow: {
+    cardContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
     },
-    itemCount: { fontSize: 13, color: '#64748B' },
-    statusBadge: {
-        backgroundColor: '#E0F2FE',
-        paddingHorizontal: 10,
-        paddingVertical: 4,
-        borderRadius: 8,
-    },
-    statusText: {
-        fontSize: 12,
+    invoiceText: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
+    dateText: { fontSize: 12, color: '#94A3B8', marginTop: 4 },
+    amountText: {
+        fontSize: 15,
         fontWeight: '700',
-        color: '#0284C7',
+        color: '#0F172A',
+        textAlign: 'right',
     },
-    emptyState: {
+
+    // Status
+    statusContainer: {
+        flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 120,
+        alignSelf: 'flex-end',
+        marginTop: 6,
     },
-    emptyText: {
-        marginTop: 16,
-        fontSize: 16,
-        color: '#94A3B8',
+    statusDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#10B981',
+        marginRight: 6,
     },
+    statusLabel: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#10B981',
+        textTransform: 'uppercase',
+    },
+
+    emptyState: { alignItems: 'center', marginTop: 100 },
+    emptyText: { marginTop: 10, color: '#94A3B8', fontSize: 14 },
 })
+
+export default StaffOrdersScreen

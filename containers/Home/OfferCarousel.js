@@ -3,30 +3,39 @@ import {
     ScrollView,
     View,
     Text,
-    StyleSheet,
     Image,
+    StyleSheet,
     TouchableOpacity,
 } from 'react-native'
 
 const OfferCarousel = ({ offers }) => {
+    if (!offers || offers.length === 0) return null
+
     return (
         <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingLeft: 15, paddingVertical: 10 }}
+            contentContainerStyle={{ paddingLeft: 15 }}
         >
             {offers.map((item, index) => (
                 <View
                     key={index}
-                    style={[styles.card, { backgroundColor: item.bgColor }]}
+                    style={[
+                        styles.card,
+                        { backgroundColor: item.bgColor || '#f0f0f0' },
+                    ]}
                 >
                     <View style={styles.textPart}>
-                        <Text style={styles.title}>{item.title}</Text>
-                        <TouchableOpacity style={styles.shopBtn}>
-                            <Text style={styles.shopText}>Shop Now</Text>
+                        <Text style={styles.title} numberOfLines={2}>
+                            {item.title}
+                        </Text>
+                        <TouchableOpacity style={styles.btn}>
+                            <Text style={styles.btnText}>Shop Now</Text>
                         </TouchableOpacity>
                     </View>
-                    <Image source={item.image} style={styles.image} />
+                    {item.image && (
+                        <Image source={item.image} style={styles.image} />
+                    )}
                 </View>
             ))}
         </ScrollView>
@@ -35,30 +44,33 @@ const OfferCarousel = ({ offers }) => {
 
 const styles = StyleSheet.create({
     card: {
-        width: 280,
-        height: 130,
+        width: 260,
+        height: 140,
         borderRadius: 16,
         marginRight: 15,
         flexDirection: 'row',
         padding: 15,
         elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
     },
     textPart: { flex: 1.5, justifyContent: 'center' },
     title: {
         fontSize: 15,
         fontWeight: 'bold',
         color: '#333',
-        marginBottom: 12,
+        marginBottom: 10,
     },
-    shopBtn: {
+    btn: {
         backgroundColor: '#1e3c72',
         paddingVertical: 6,
         paddingHorizontal: 12,
-        borderRadius: 6,
-        alignSelf: 'flex-start',
+        borderRadius: 8,
     },
-    shopText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
-    image: { flex: 1, width: 80, height: 80, resizeMode: 'contain' },
+    btnText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
+    image: { flex: 1, width: 70, height: 70, resizeMode: 'contain' },
 })
 
 export default OfferCarousel

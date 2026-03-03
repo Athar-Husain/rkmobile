@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import {
     View,
     Text,
@@ -6,36 +6,42 @@ import {
     TouchableOpacity,
     Alert,
     Modal,
-    TextInput,
     ActivityIndicator,
+    StatusBar,
+    Dimensions,
+    Animated,
 } from 'react-native'
 import {
     Camera,
     useCameraDevice,
     useCodeScanner,
 } from 'react-native-vision-camera'
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback' // Added
 import { useDispatch } from 'react-redux'
-import {
-    validateForStaffAction,
-    redeemCouponStaff,
-} from '../../redux/features/Coupons/CouponSlice'
+import { validateForStaffAction } from '../../redux/features/Coupons/CouponSlice'
+import { useNavigation } from '@react-navigation/native'
+
+const { width } = Dimensions.get('window')
+
+// Haptic configuration
+const hapticOptions = {
+    enableVibrateFallback: true,
+    ignoreAndroidSystemSettings: false,
+}
 
 const StaffScannerScreen = () => {
     const dispatch = useDispatch()
-
-    // In V4, useCameraDevice('back') is the standard way to get the camera
+    const navigation = useNavigation()
     const device = useCameraDevice('back')
 
     const [hasPermission, setHasPermission] = useState(false)
-    const [scannedCode, setScannedCode] = useState(null)
     const [isProcessing, setIsProcessing] = useState(false)
-
-    // Redemption Modal State
     const [confirmModal, setConfirmModal] = useState(false)
     const [couponData, setCouponData] = useState(null)
-    const [orderAmount, setOrderAmount] = useState('')
 
-    // Request Permissions
+    // Animation for the scanning line
+    const scanAnim = useRef(new Animated.Value(0)).current
+
     useEffect(() => {
         ;(async () => {
             const status = await Camera.requestCameraPermission()
@@ -43,159 +49,247 @@ const StaffScannerScreen = () => {
         })()
     }, [])
 
-    // 1. Logic to handle the scanned code
-    const onCodeScanned = useCallback(
+    // Loop scanning animation
+    useEffect(() => {
+        if (!confirmModal && !isProcessing) {
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(scanAnim, {
+                        toValue: 210,
+                        duration: 2000,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(scanAnim, {
+                        toValue: 0,
+                        duration: 2000,
+                        useNativeDriver: true,
+                    }),
+                ])
+            ).start()
+        } else {
+            scanAnim.stopAnimation()
+        }
+    }, [confirmModal, isProcessing])
+
+    const resetScanner = () => {
+        setConfirmModal(false)
+        setCouponData(null)
+        setIsProcessing(false)
+    }
+
+    const handleScan = useCallback(
         (code) => {
             if (isProcessing || confirmModal) return
-
             setIsProcessing(true)
 
-            // Validate the code with your Redux action
             dispatch(validateForStaffAction({ code })).then((res) => {
                 if (res.meta.requestStatus === 'fulfilled') {
+                    // SUCCESS: Long distinct vibration
+                    ReactNativeHapticFeedback.trigger(
+                        'notificationSuccess',
+                        hapticOptions
+                    )
+
                     setCouponData(res.payload)
-                    setScannedCode(code)
                     setConfirmModal(true)
                 } else {
-                    Alert.alert('Error', res.payload || 'Invalid Coupon', [
-                        { text: 'OK', onPress: () => setIsProcessing(false) },
-                    ])
+                    // ERROR: Three short vibrations
+                    ReactNativeHapticFeedback.trigger(
+                        'notificationError',
+                        hapticOptions
+                    )
+
+                    Alert.alert('Invalid Coupon', res.payload || 'Try again')
+                    setIsProcessing(false)
                 }
             })
         },
-        [isProcessing, confirmModal, dispatch]
+        [dispatch, isProcessing, confirmModal]
     )
 
-    // 2. Built-in Code Scanner Configuration (Vision Camera V4)
     const codeScanner = useCodeScanner({
-        codeTypes: ['qr', 'ean-13', 'code-128'], // Add types you need
+        codeTypes: ['qr', 'ean-13', 'code-128'],
         onCodeScanned: (codes) => {
             if (codes.length > 0 && codes[0].value) {
-                onCodeScanned(codes[0].value)
+                handleScan(codes[0].value)
             }
         },
     })
 
-    const handleFinalRedeem = () => {
-        if (!orderAmount || isNaN(orderAmount)) {
-            return Alert.alert('Required', 'Please enter a valid order amount')
-        }
-
-        const payload = {
-            uniqueCode: scannedCode,
-            orderAmount: parseFloat(orderAmount),
-            storeId: 'YOUR_STORE_ID',
-        }
-
-        dispatch(redeemCouponStaff(payload)).then((res) => {
-            if (res.meta.requestStatus === 'fulfilled') {
-                setConfirmModal(false)
-                setScannedCode(null)
-                setOrderAmount('')
-                setIsProcessing(false)
-                Alert.alert(
-                    'Success',
-                    'Discount Applied and Coupon Marked as Used!'
-                )
-            } else {
-                Alert.alert(
-                    'Redemption Failed',
-                    res.payload || 'Something went wrong'
-                )
-            }
+    const formatDate = (couponData) => {
+        const userCoupon = couponData?.userCoupon
+        if (!userCoupon?.validUntil) return 'N/A'
+        const date = new Date(userCoupon.validUntil)
+        return date.toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
         })
     }
 
-    if (!hasPermission) {
-        return (
-            <View style={styles.center}>
-                <Text>No Camera Permission</Text>
-            </View>
-        )
+    const getDaysRemaining = (couponData) => {
+        const userCoupon = couponData?.userCoupon
+        if (!userCoupon?.validUntil) return null
+        const diffTime = new Date(userCoupon.validUntil) - new Date()
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        if (diffDays > 0) return `${diffDays} days left`
+        return 'Expires today'
     }
 
-    if (!device) {
+    if (!hasPermission || !device) {
         return (
             <View style={styles.center}>
-                <Text>Camera Device Not Found</Text>
+                <ActivityIndicator size="large" color="#004AAD" />
             </View>
         )
     }
 
     return (
         <View style={styles.container}>
+            <StatusBar
+                barStyle="light-content"
+                translucent
+                backgroundColor="transparent"
+            />
+
             <Camera
                 style={StyleSheet.absoluteFill}
                 device={device}
-                isActive={!confirmModal && !isProcessing} // Stop camera when processing
-                codeScanner={codeScanner} // Native scanning logic
+                isActive={!confirmModal && !isProcessing}
+                codeScanner={codeScanner}
             />
 
-            {/* Overlay UI */}
-            <View style={styles.overlay}>
-                <View style={styles.scannerFrame}>
-                    {isProcessing && !confirmModal && (
-                        <ActivityIndicator size="large" color="#004AAD" />
-                    )}
+            <View style={styles.overlayContainer}>
+                <View style={styles.maskTop} />
+                <View style={styles.maskMiddle}>
+                    <View style={styles.maskSide} />
+                    <View style={styles.focusedSpace}>
+                        {/* Corner Accents */}
+                        <View style={[styles.corner, styles.topLeft]} />
+                        <View style={[styles.corner, styles.topRight]} />
+                        <View style={[styles.corner, styles.bottomLeft]} />
+                        <View style={[styles.corner, styles.bottomRight]} />
+
+                        {/* Animated Scanning Line */}
+                        {!isProcessing && !confirmModal && (
+                            <Animated.View
+                                style={[
+                                    styles.scanLine,
+                                    { transform: [{ translateY: scanAnim }] },
+                                ]}
+                            />
+                        )}
+
+                        {isProcessing && (
+                            <ActivityIndicator size="large" color="#FFF" />
+                        )}
+                    </View>
+                    <View style={styles.maskSide} />
                 </View>
-                <Text style={styles.hintText}>
-                    {isProcessing
-                        ? 'Validating...'
-                        : 'Align QR code within the frame'}
-                </Text>
+                <View style={styles.maskBottom}>
+                    <Text style={styles.hintText}>
+                        {isProcessing ? 'VERIFYING...' : 'ALIGN QR TO SCAN'}
+                    </Text>
+                </View>
             </View>
 
-            {/* Redemption Confirmation Modal */}
             <Modal visible={confirmModal} animationType="slide" transparent>
-                <View style={styles.modalContainer}>
-                    <View style={styles.modalContent}>
-                        <Text style={styles.modalTitle}>Redeem Coupon</Text>
+                <View style={styles.modalBackdrop}>
+                    <View style={styles.bottomSheet}>
+                        <View style={styles.handle} />
 
-                        <View style={styles.couponInfo}>
-                            <Text style={styles.userName}>
-                                {couponData?.user?.name || 'Customer'}
-                            </Text>
-                            <Text style={styles.couponDetail}>
-                                {couponData?.coupon?.title}
-                            </Text>
-                            <View style={styles.discountBadge}>
-                                <Text style={styles.discountBadgeText}>
-                                    {couponData?.coupon?.type === 'PERCENTAGE'
-                                        ? `${couponData.coupon.value}% OFF`
-                                        : `₹${couponData?.coupon?.value} OFF`}
+                        <View style={styles.statusHeader}>
+                            <View style={styles.validBadge}>
+                                <Text style={styles.validBadgeText}>
+                                    VALID COUPON
                                 </Text>
                             </View>
                         </View>
 
-                        <Text style={styles.inputLabel}>
-                            Enter Total Bill Amount (₹)
-                        </Text>
-                        <TextInput
-                            style={styles.input}
-                            placeholder="e.g. 1200"
-                            keyboardType="numeric"
-                            value={orderAmount}
-                            onChangeText={setOrderAmount}
-                            autoFocus
-                        />
+                        <View style={styles.card}>
+                            <View style={styles.userInfoRow}>
+                                <View style={styles.avatarPlaceholder}>
+                                    <Text style={styles.avatarText}>
+                                        {couponData?.user?.name?.charAt(0)}
+                                    </Text>
+                                </View>
+                                <View>
+                                    <Text style={styles.userNameText}>
+                                        {couponData?.user?.name}
+                                    </Text>
+                                    <Text style={styles.userSubText}>
+                                        {couponData?.user?.maskedMobile ||
+                                            couponData?.user?.mobile}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.divider} />
+
+                            <Text style={styles.couponTitle}>
+                                {couponData?.coupon?.title}
+                            </Text>
+
+                            <View style={styles.valueRow}>
+                                <Text style={styles.valueAmount}>
+                                    {couponData?.coupon?.type === 'PERCENTAGE'
+                                        ? `${couponData?.coupon?.value}%`
+                                        : `₹${couponData?.coupon?.value}`}
+                                </Text>
+                                <Text style={styles.valueLabel}>OFF</Text>
+                            </View>
+
+                            <View style={styles.infoGrid}>
+                                <View style={styles.gridItem}>
+                                    <Text style={styles.gridLabel}>
+                                        MINIMUM BILL
+                                    </Text>
+                                    <Text style={styles.gridValue}>
+                                        ₹
+                                        {couponData?.coupon?.minPurchaseAmount?.toLocaleString()}
+                                    </Text>
+                                </View>
+                                <View
+                                    style={[
+                                        styles.gridItem,
+                                        { alignItems: 'flex-end' },
+                                    ]}
+                                >
+                                    <Text style={styles.gridLabel}>
+                                        EXPIRES ON
+                                    </Text>
+                                    <Text style={styles.gridValue}>
+                                        {formatDate(couponData)}
+                                    </Text>
+                                    <Text style={styles.expiryCount}>
+                                        {getDaysRemaining(couponData)}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
 
                         <TouchableOpacity
-                            style={styles.redeemBtn}
-                            onPress={handleFinalRedeem}
+                            style={styles.actionButton}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                                ReactNativeHapticFeedback.trigger(
+                                    'impactLight',
+                                    hapticOptions
+                                )
+                                navigation.navigate('StaffPOS', { couponData })
+                                resetScanner()
+                            }}
                         >
-                            <Text style={styles.redeemBtnText}>
-                                CONFIRM REDEMPTION
+                            <Text style={styles.actionButtonText}>
+                                APPLY & START BILLING
                             </Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            onPress={() => {
-                                setConfirmModal(false)
-                                setIsProcessing(false)
-                                setScannedCode(null)
-                            }}
+                            onPress={resetScanner}
+                            style={styles.closeButton}
                         >
-                            <Text style={styles.cancelText}>Cancel</Text>
+                            <Text style={styles.closeButtonText}>CANCEL</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -207,73 +301,219 @@ const StaffScannerScreen = () => {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000' },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    overlay: {
+    overlayContainer: { ...StyleSheet.absoluteFillObject },
+    maskTop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)' },
+    maskBottom: {
         flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        alignItems: 'center',
+        paddingTop: 40,
+    },
+    maskMiddle: { flexDirection: 'row', height: 260 },
+    maskSide: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)' },
+    focusedSpace: {
+        width: 260,
+        height: 260,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.4)',
+        position: 'relative',
     },
-    scannerFrame: {
-        width: 250,
-        height: 250,
-        borderWidth: 2,
+
+    // Scanner Line
+    scanLine: {
+        position: 'absolute',
+        top: 20,
+        left: 20,
+        right: 20,
+        height: 2,
+        backgroundColor: '#004AAD',
+        opacity: 0.6,
+        shadowColor: '#004AAD',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 1,
+        shadowRadius: 10,
+        elevation: 5,
+    },
+
+    corner: {
+        width: 35,
+        height: 35,
         borderColor: '#004AAD',
+        position: 'absolute',
+    },
+    topLeft: {
+        top: 0,
+        left: 0,
+        borderTopWidth: 5,
+        borderLeftWidth: 5,
+        borderTopLeftRadius: 15,
+    },
+    topRight: {
+        top: 0,
+        right: 0,
+        borderTopWidth: 5,
+        borderRightWidth: 5,
+        borderTopRightRadius: 15,
+    },
+    bottomLeft: {
+        bottom: 0,
+        left: 0,
+        borderBottomWidth: 5,
+        borderLeftWidth: 5,
+        borderBottomLeftRadius: 15,
+    },
+    bottomRight: {
+        bottom: 0,
+        right: 0,
+        borderBottomWidth: 5,
+        borderRightWidth: 5,
+        borderBottomRightRadius: 15,
+    },
+
+    hintText: {
+        color: '#FFF',
+        fontSize: 13,
+        fontWeight: '800',
+        letterSpacing: 2,
+        opacity: 0.9,
+    },
+
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(15, 23, 42, 0.9)',
+        justifyContent: 'flex-end',
+    },
+    bottomSheet: {
+        backgroundColor: '#FFF',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        paddingHorizontal: 24,
+        paddingBottom: 40,
+        paddingTop: 12,
+    },
+    handle: {
+        width: 40,
+        height: 4,
+        backgroundColor: '#E2E8F0',
+        borderRadius: 2,
+        alignSelf: 'center',
+        marginBottom: 20,
+    },
+
+    statusHeader: { alignItems: 'center', marginBottom: 15 },
+    validBadge: {
+        backgroundColor: '#DCFCE7',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    validBadgeText: {
+        color: '#15803D',
+        fontSize: 11,
+        fontWeight: '900',
+        letterSpacing: 1,
+    },
+
+    card: {
+        backgroundColor: '#F8FAFC',
+        borderRadius: 24,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        marginBottom: 25,
+    },
+    userInfoRow: { flexDirection: 'row', alignItems: 'center' },
+    avatarPlaceholder: {
+        width: 48,
+        height: 48,
+        borderRadius: 16,
+        backgroundColor: '#004AAD',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 15,
+    },
+    avatarText: { color: '#FFF', fontWeight: 'bold', fontSize: 20 },
+    userNameText: { fontSize: 18, fontWeight: '800', color: '#1E293B' },
+    userSubText: { fontSize: 14, color: '#64748B', marginTop: 2 },
+
+    divider: {
+        height: 1,
+        backgroundColor: '#E2E8F0',
+        marginVertical: 20,
+        borderStyle: 'dashed',
+    },
+
+    couponTitle: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#94A3B8',
+        textAlign: 'center',
+        letterSpacing: 1,
+    },
+    valueRow: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'baseline',
+        marginVertical: 10,
+    },
+    valueAmount: { fontSize: 48, fontWeight: '900', color: '#004AAD' },
+    valueLabel: {
+        fontSize: 16,
+        fontWeight: '800',
+        color: '#004AAD',
+        marginLeft: 4,
+    },
+
+    infoGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 15,
+    },
+    gridItem: { flex: 1 },
+    gridLabel: {
+        fontSize: 10,
+        color: '#94A3B8',
+        fontWeight: '800',
+        letterSpacing: 0.5,
+    },
+    gridValue: {
+        fontSize: 15,
+        fontWeight: '800',
+        color: '#1E293B',
+        marginTop: 2,
+    },
+    expiryCount: {
+        fontSize: 11,
+        color: '#EF4444',
+        fontWeight: '700',
+        marginTop: 2,
+    },
+
+    actionButton: {
+        backgroundColor: '#004AAD',
+        height: 64,
         borderRadius: 20,
         justifyContent: 'center',
         alignItems: 'center',
+        shadowColor: '#004AAD',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 8,
     },
-    hintText: { color: '#FFF', marginTop: 20, fontWeight: 'bold' },
-    modalContainer: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.6)',
-        justifyContent: 'flex-end',
+    actionButtonText: {
+        color: '#FFF',
+        fontWeight: '900',
+        fontSize: 16,
+        letterSpacing: 1,
     },
-    modalContent: {
-        backgroundColor: '#FFF',
-        borderTopLeftRadius: 30,
-        borderTopRightRadius: 30,
-        padding: 30,
-        alignItems: 'center',
+    closeButton: { marginTop: 20, padding: 10 },
+    closeButtonText: {
+        color: '#64748B',
+        fontWeight: '700',
+        textAlign: 'center',
+        fontSize: 14,
     },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20 },
-    couponInfo: { alignItems: 'center', marginBottom: 20 },
-    userName: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-    couponDetail: { color: '#666', marginVertical: 4 },
-    discountBadge: {
-        backgroundColor: '#E3F2FD',
-        padding: 8,
-        borderRadius: 8,
-        marginTop: 5,
-    },
-    discountBadgeText: {
-        color: '#004AAD',
-        fontWeight: 'bold',
-    },
-    inputLabel: {
-        alignSelf: 'flex-start',
-        color: '#666',
-        marginBottom: 8,
-        fontSize: 12,
-    },
-    input: {
-        width: '100%',
-        height: 55,
-        backgroundColor: '#F5F5F5',
-        borderRadius: 12,
-        paddingHorizontal: 20,
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 20,
-    },
-    redeemBtn: {
-        backgroundColor: '#004AAD',
-        width: '100%',
-        padding: 18,
-        borderRadius: 15,
-        alignItems: 'center',
-    },
-    redeemBtnText: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
-    cancelText: { color: '#FF3B30', marginTop: 20, fontWeight: 'bold' },
 })
 
 export default StaffScannerScreen

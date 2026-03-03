@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
     View,
     Text,
@@ -11,68 +11,101 @@ import {
     KeyboardAvoidingView,
     Platform,
     Modal,
-    Appearance,
+    useColorScheme,
+    ActivityIndicator,
 } from 'react-native'
 import { useDispatch, useSelector } from 'react-redux'
 import {
     clearPOSSummary,
     previewPurchase,
     recordPurchase,
-    resetPreview,
 } from '../../redux/features/Purchases/PurchaseSlice'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window')
 const scale = (size) => (width / 375) * size
 
 const StaffPOSScreen = ({ route, navigation }) => {
     const dispatch = useDispatch()
-    const colorScheme = Appearance.getColorScheme()
-    const isDark = colorScheme === 'dark'
+    const systemTheme = useColorScheme()
+    const isDark = systemTheme === 'dark'
 
+    // Refs for better UX
+    const nameInputRef = useRef(null)
+
+    // Selectors
     const { staffPOSSummary, isPurchaseLoading } = useSelector(
         (state) => state.purchase
     )
 
+    // Local State
     const [cartItems, setCartItems] = useState([])
-    const [name, setName] = useState('')
-    const [price, setPrice] = useState('')
-    const [qty, setQty] = useState('1')
-    const [tax, setTax] = useState('0')
+    const [form, setForm] = useState({ name: '', price: '', qty: '1' })
     const [showReceipt, setShowReceipt] = useState(false)
 
     const couponCode = route.params?.couponData?.userCoupon?.uniqueCode || null
     const userId = route.params?.couponData?.user?.id || null
     const storeId = route.params?.storeId || 'STORE_DEFAULT'
 
-    // Add Item
-    const addItem = () => {
+    // Theme Object
+    const theme = useMemo(
+        () => ({
+            background: isDark ? '#121212' : '#FFFFFF',
+            surface: isDark ? '#1E1E1E' : '#F9F9F9',
+            text: isDark ? '#FFFFFF' : '#000000',
+            subtext: isDark ? '#AAAAAA' : '#666666',
+            border: isDark ? '#333333' : '#E0E0E0',
+            primary: '#004AAD',
+        }),
+        [isDark]
+    )
+
+    // Handlers
+    const updateFormField = (key, value) =>
+        setForm((prev) => ({ ...prev, [key]: value }))
+
+    const addItem = useCallback(() => {
+        const { name, price, qty } = form
         if (!name.trim() || !price) {
-            Alert.alert('Error', 'Please enter item name and price')
-            return
-        }
-        if (Number(price) <= 0 || Number(qty) <= 0) {
-            Alert.alert('Error', 'Price and quantity must be greater than 0')
+            Alert.alert('Missing Fields', 'Please enter item name and price')
             return
         }
 
         const newItem = {
             name: name.trim(),
             unitPrice: parseFloat(price),
-            quantity: parseInt(qty),
-            taxPercent: parseFloat(tax) || 0,
+            quantity: parseInt(qty) || 1,
         }
 
         setCartItems((prev) => [...prev, newItem])
-        setName('')
-        setPrice('')
-        setQty('1')
-        setTax('0')
-    }
+        setForm({ name: '', price: '', qty: '1' })
+        nameInputRef.current?.focus()
+    }, [form])
 
-    // Update Preview
+    const removeItem = useCallback(
+        (index) => {
+            setCartItems((prev) => {
+                const newCart = prev.filter((_, i) => i !== index)
+                if (newCart.length === 0) dispatch(clearPOSSummary())
+                return newCart
+            })
+        },
+        [dispatch]
+    )
+
+    const adjustQuantity = useCallback((index, delta) => {
+        setCartItems((prev) =>
+            prev.map((item, i) =>
+                i === index
+                    ? { ...item, quantity: Math.max(1, item.quantity + delta) }
+                    : item
+            )
+        )
+    }, [])
+
+    // Debounced Preview
     useEffect(() => {
-        if (!cartItems.length || !userId || !storeId) return
+        if (cartItems.length === 0) return
 
         const timer = setTimeout(() => {
             dispatch(
@@ -83,354 +116,298 @@ const StaffPOSScreen = ({ route, navigation }) => {
                     couponCode,
                 })
             )
-        }, 300)
+        }, 400)
 
         return () => clearTimeout(timer)
     }, [cartItems, couponCode, userId, storeId, dispatch])
 
-    // Remove Item
-    const removeItem = (index) => {
-        setCartItems((prev) => prev.filter((_, i) => i !== index))
+    const handleCompletePurchase = async () => {
+        if (!cartItems.length) return Alert.alert('Error', 'Cart is empty')
+
+        Alert.alert(
+            'Confirm Purchase',
+            `Complete transaction for ₹${staffPOSSummary?.finalAmount || 0}?`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Confirm',
+                    onPress: async () => {
+                        const res = await dispatch(
+                            recordPurchase({
+                                userId,
+                                storeId,
+                                items: cartItems,
+                                couponCode,
+                            })
+                        )
+                        if (res.meta.requestStatus === 'fulfilled')
+                            setShowReceipt(true)
+                    },
+                },
+            ]
+        )
     }
 
-    // Adjust Quantity
-    const adjustQuantity = (index, delta) => {
-        setCartItems((prev) => {
-            const updated = [...prev]
-            updated[index].quantity = Math.max(
-                1,
-                updated[index].quantity + delta
-            )
-            return updated
-        })
-    }
-
-    // Complete Purchase
-    const completePurchase = async () => {
-        if (cartItems.length === 0) {
-            Alert.alert('Error', 'Cart is empty')
-            return
-        }
-
-        try {
-            const res = await dispatch(
-                recordPurchase({
-                    userId,
-                    storeId,
-                    items: cartItems,
-                    couponCode,
-                })
-            )
-
-            if (res.meta.requestStatus === 'fulfilled') {
-                setShowReceipt(true)
-            } else {
-                Alert.alert('Error', res.payload?.message || 'Purchase failed')
-            }
-        } catch (error) {
-            Alert.alert('Error', 'Something went wrong')
-        }
-    }
-
-    // Cancel Purchase
-    const cancelPurchase = () => {
+    const resetSession = () => {
         setCartItems([])
         dispatch(clearPOSSummary())
         setShowReceipt(false)
     }
 
-    const renderItem = useCallback(
+    // UI Components
+    const renderCartItem = useCallback(
         ({ item, index }) => (
             <View
                 style={[
                     styles.cartRow,
-                    { backgroundColor: isDark ? '#222' : '#f9f9f9' },
+                    {
+                        backgroundColor: theme.surface,
+                        borderColor: theme.border,
+                    },
                 ]}
             >
                 <View style={{ flex: 1 }}>
-                    <Text
-                        style={[
-                            styles.cartItem,
-                            { color: isDark ? '#fff' : '#000' },
-                        ]}
-                    >
-                        {item.name} - ₹{item.unitPrice}
+                    <Text style={[styles.cartItemName, { color: theme.text }]}>
+                        {item.name}
                     </Text>
-                    <View
-                        style={{
-                            flexDirection: 'row',
-                            gap: scale(8),
-                            marginTop: 4,
-                        }}
-                    >
-                        <TouchableOpacity
-                            onPress={() => adjustQuantity(index, -1)}
-                            style={styles.qtyBtn}
-                        >
-                            <Text style={styles.qtyText}>-</Text>
-                        </TouchableOpacity>
-                        <Text
-                            style={{
-                                color: isDark ? '#fff' : '#000',
-                                minWidth: scale(20),
-                            }}
-                        >
-                            {item.quantity}
-                        </Text>
-                        <TouchableOpacity
-                            onPress={() => adjustQuantity(index, 1)}
-                            style={styles.qtyBtn}
-                        >
-                            <Text style={styles.qtyText}>+</Text>
-                        </TouchableOpacity>
-                        {item.taxPercent > 0 && (
-                            <Text style={styles.subText}>
-                                Tax: {item.taxPercent}%
-                            </Text>
-                        )}
-                    </View>
+                    <Text style={{ color: theme.subtext }}>
+                        ₹{item.unitPrice} per unit
+                    </Text>
                 </View>
-                <TouchableOpacity onPress={() => removeItem(index)}>
-                    <Text style={styles.removeText}>Remove</Text>
-                </TouchableOpacity>
+                <View style={styles.qtyContainer}>
+                    <TouchableOpacity
+                        onPress={() => adjustQuantity(index, -1)}
+                        style={styles.qtyBtn}
+                    >
+                        <Text style={[styles.qtyText, { color: theme.text }]}>
+                            −
+                        </Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.qtyValue, { color: theme.text }]}>
+                        {item.quantity}
+                    </Text>
+                    <TouchableOpacity
+                        onPress={() => adjustQuantity(index, 1)}
+                        style={styles.qtyBtn}
+                    >
+                        <Text style={[styles.qtyText, { color: theme.text }]}>
+                            +
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={() => removeItem(index)}
+                        style={styles.deleteBtn}
+                    >
+                        <Text style={styles.deleteText}>Remove</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
         ),
-        [isDark]
+        [theme, adjustQuantity, removeItem]
     )
 
     return (
-        <SafeAreaView
-            style={{ flex: 1, backgroundColor: isDark ? '#000' : '#fff' }}
-        >
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
             >
                 <FlatList
                     data={cartItems}
-                    keyExtractor={(item, index) => item.name + index.toString()}
-                    renderItem={renderItem}
+                    keyExtractor={(_, index) => index.toString()}
+                    renderItem={renderCartItem}
+                    contentContainerStyle={{ paddingBottom: 100 }}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Text style={{ color: theme.subtext }}>
+                                No items in cart
+                            </Text>
+                        </View>
+                    }
                     ListHeaderComponent={
                         <View style={styles.container}>
                             <Text
-                                style={[
-                                    styles.header,
-                                    { color: isDark ? '#fff' : '#000' },
-                                ]}
+                                style={[styles.header, { color: theme.text }]}
                             >
                                 POS Billing
                             </Text>
 
-                            {/* Inputs */}
-                            <View style={styles.row}>
+                            <View style={styles.inputGroup}>
                                 <TextInput
+                                    ref={nameInputRef}
                                     placeholder="Item Name"
-                                    value={name}
-                                    onChangeText={setName}
+                                    value={form.name}
+                                    onChangeText={(v) =>
+                                        updateFormField('name', v)
+                                    }
                                     style={[
                                         styles.input,
                                         {
-                                            backgroundColor: isDark
-                                                ? '#333'
-                                                : '#fff',
-                                            color: isDark ? '#fff' : '#000',
+                                            backgroundColor: theme.surface,
+                                            color: theme.text,
+                                            borderColor: theme.border,
                                         },
                                     ]}
-                                    placeholderTextColor={
-                                        isDark ? '#aaa' : '#999'
-                                    }
+                                    placeholderTextColor={theme.subtext}
                                 />
-                                <TextInput
-                                    placeholder="Price"
-                                    keyboardType="numeric"
-                                    value={price}
-                                    onChangeText={setPrice}
-                                    style={[
-                                        styles.input,
-                                        {
-                                            backgroundColor: isDark
-                                                ? '#333'
-                                                : '#fff',
-                                            color: isDark ? '#fff' : '#000',
-                                        },
-                                    ]}
-                                    placeholderTextColor={
-                                        isDark ? '#aaa' : '#999'
-                                    }
-                                />
+                                <View style={styles.row}>
+                                    <TextInput
+                                        placeholder="Price"
+                                        keyboardType="numeric"
+                                        value={form.price}
+                                        onChangeText={(v) =>
+                                            updateFormField('price', v)
+                                        }
+                                        style={[
+                                            styles.input,
+                                            {
+                                                flex: 2,
+                                                backgroundColor: theme.surface,
+                                                color: theme.text,
+                                                borderColor: theme.border,
+                                            },
+                                        ]}
+                                        placeholderTextColor={theme.subtext}
+                                    />
+                                    <TextInput
+                                        placeholder="Qty"
+                                        keyboardType="numeric"
+                                        value={form.qty}
+                                        onChangeText={(v) =>
+                                            updateFormField('qty', v)
+                                        }
+                                        style={[
+                                            styles.input,
+                                            {
+                                                flex: 1,
+                                                backgroundColor: theme.surface,
+                                                color: theme.text,
+                                                borderColor: theme.border,
+                                            },
+                                        ]}
+                                        placeholderTextColor={theme.subtext}
+                                    />
+                                </View>
+                                <TouchableOpacity
+                                    style={styles.addBtn}
+                                    onPress={addItem}
+                                >
+                                    <Text style={styles.btnText}>
+                                        Add to Cart
+                                    </Text>
+                                </TouchableOpacity>
                             </View>
 
-                            <View style={styles.row}>
-                                <TextInput
-                                    placeholder="Quantity"
-                                    keyboardType="numeric"
-                                    value={qty}
-                                    onChangeText={setQty}
-                                    style={[
-                                        styles.input,
-                                        {
-                                            backgroundColor: isDark
-                                                ? '#333'
-                                                : '#fff',
-                                            color: isDark ? '#fff' : '#000',
-                                        },
-                                    ]}
-                                    placeholderTextColor={
-                                        isDark ? '#aaa' : '#999'
-                                    }
-                                />
-                                <TextInput
-                                    placeholder="Tax %"
-                                    keyboardType="numeric"
-                                    value={tax}
-                                    onChangeText={setTax}
-                                    style={[
-                                        styles.input,
-                                        {
-                                            backgroundColor: isDark
-                                                ? '#333'
-                                                : '#fff',
-                                            color: isDark ? '#fff' : '#000',
-                                        },
-                                    ]}
-                                    placeholderTextColor={
-                                        isDark ? '#aaa' : '#999'
-                                    }
-                                />
-                            </View>
-
-                            <TouchableOpacity
-                                style={styles.addBtn}
-                                onPress={addItem}
-                            >
-                                <Text style={styles.btnText}>Add Item</Text>
-                            </TouchableOpacity>
-
-                            {/* Summary */}
-                            {staffPOSSummary && (
+                            {staffPOSSummary && cartItems.length > 0 && (
                                 <View
                                     style={[
                                         styles.summary,
-                                        {
-                                            backgroundColor: isDark
-                                                ? '#111'
-                                                : '#f5f7fa',
-                                        },
+                                        { backgroundColor: theme.surface },
                                     ]}
                                 >
-                                    <Text
-                                        style={{
-                                            color: isDark ? '#fff' : '#000',
-                                        }}
-                                    >
-                                        Subtotal: ₹{staffPOSSummary.subtotal}
-                                    </Text>
-                                    <Text
-                                        style={{
-                                            color: isDark ? '#fff' : '#000',
-                                        }}
-                                    >
-                                        Tax: ₹{staffPOSSummary.tax}
-                                    </Text>
-                                    <Text
+                                    <View style={styles.summaryRow}>
+                                        <Text style={{ color: theme.subtext }}>
+                                            Subtotal
+                                        </Text>
+                                        <Text style={{ color: theme.text }}>
+                                            ₹{staffPOSSummary.subtotal}
+                                        </Text>
+                                    </View>
+                                    <View
                                         style={[
-                                            styles.finalAmount,
-                                            { color: isDark ? '#fff' : '#000' },
+                                            styles.summaryRow,
+                                            styles.totalRow,
                                         ]}
                                     >
-                                        Final: ₹{staffPOSSummary.finalAmount}
-                                    </Text>
+                                        <Text
+                                            style={[
+                                                styles.finalAmount,
+                                                { color: theme.text },
+                                            ]}
+                                        >
+                                            Total Amount
+                                        </Text>
+                                        <Text
+                                            style={[
+                                                styles.finalAmount,
+                                                { color: theme.primary },
+                                            ]}
+                                        >
+                                            ₹{staffPOSSummary.finalAmount}
+                                        </Text>
+                                    </View>
                                 </View>
                             )}
-
-                            {/* Complete / Cancel */}
-                            <View
-                                style={{
-                                    flexDirection: 'row',
-                                    gap: scale(10),
-                                    marginTop: scale(20),
-                                }}
-                            >
-                                <TouchableOpacity
-                                    style={[
-                                        styles.completeBtn,
-                                        (!staffPOSSummary ||
-                                            isPurchaseLoading) && {
-                                            opacity: 0.6,
-                                        },
-                                        { flex: 1 },
-                                    ]}
-                                    onPress={completePurchase}
-                                    disabled={
-                                        !staffPOSSummary || isPurchaseLoading
-                                    }
-                                >
-                                    <Text style={styles.btnText}>
-                                        {isPurchaseLoading
-                                            ? 'Processing...'
-                                            : 'Complete Purchase'}
-                                    </Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                    style={[styles.cancelBtn, { flex: 1 }]}
-                                    onPress={cancelPurchase}
-                                >
-                                    <Text style={styles.btnText}>Cancel</Text>
-                                </TouchableOpacity>
-                            </View>
                         </View>
                     }
-                    ListFooterComponent={<View style={{ height: scale(20) }} />}
                 />
 
-                {/* Receipt Modal */}
-                <Modal
-                    visible={showReceipt}
-                    transparent={true}
-                    animationType="slide"
+                {/* Sticky Bottom Actions */}
+                <View
+                    style={[
+                        styles.footer,
+                        {
+                            backgroundColor: theme.background,
+                            borderTopColor: theme.border,
+                        },
+                    ]}
                 >
+                    <TouchableOpacity
+                        style={[
+                            styles.completeBtn,
+                            (!staffPOSSummary || isPurchaseLoading) &&
+                                styles.disabled,
+                        ]}
+                        onPress={handleCompletePurchase}
+                        disabled={!staffPOSSummary || isPurchaseLoading}
+                    >
+                        {isPurchaseLoading ? (
+                            <ActivityIndicator color="#fff" />
+                        ) : (
+                            <Text style={styles.btnText}>
+                                Complete Purchase
+                            </Text>
+                        )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={styles.cancelBtn}
+                        onPress={resetSession}
+                    >
+                        <Text style={styles.btnText}>Clear</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Receipt Modal (Briefly styled) */}
+                <Modal visible={showReceipt} transparent animationType="fade">
                     <View style={styles.modalBackground}>
                         <View
                             style={[
                                 styles.modalContainer,
-                                { backgroundColor: isDark ? '#222' : '#fff' },
+                                { backgroundColor: theme.surface },
                             ]}
                         >
                             <Text
                                 style={[
                                     styles.modalHeader,
-                                    { color: isDark ? '#fff' : '#000' },
+                                    { color: theme.text },
                                 ]}
                             >
-                                Receipt Preview
+                                Success!
                             </Text>
-                            {cartItems.map((item, i) => (
-                                <Text
-                                    key={i}
-                                    style={{
-                                        color: isDark ? '#fff' : '#000',
-                                        marginBottom: 4,
-                                    }}
-                                >
-                                    {item.name} x {item.quantity} = ₹
-                                    {item.unitPrice * item.quantity}
-                                </Text>
-                            ))}
                             <Text
                                 style={{
-                                    fontWeight: 'bold',
-                                    marginTop: 10,
-                                    color: isDark ? '#fff' : '#000',
+                                    color: theme.subtext,
+                                    textAlign: 'center',
+                                    marginBottom: 20,
                                 }}
                             >
-                                Total: ₹{staffPOSSummary?.finalAmount || 0}
+                                Purchase recorded successfully.
                             </Text>
                             <TouchableOpacity
-                                style={[styles.completeBtn, { marginTop: 10 }]}
-                                onPress={() => setShowReceipt(false)}
+                                style={styles.addBtn}
+                                onPress={resetSession}
                             >
-                                <Text style={styles.btnText}>Close</Text>
+                                <Text style={styles.btnText}>Done</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -443,109 +420,114 @@ const StaffPOSScreen = ({ route, navigation }) => {
 export default StaffPOSScreen
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        padding: scale(20),
-    },
-    header: {
-        fontSize: scale(24),
-        fontWeight: 'bold',
-        marginBottom: scale(10),
-    },
-    row: {
-        flexDirection: 'row',
-        gap: scale(8),
-        marginBottom: scale(10),
-    },
+    container: { padding: scale(20) },
+    header: { fontSize: scale(22), fontWeight: '800', marginBottom: scale(20) },
+    inputGroup: { gap: scale(10) },
+    row: { flexDirection: 'row', gap: scale(10) },
     input: {
-        flex: 1,
         borderWidth: 1,
-        borderColor: '#ccc',
-        padding: scale(10),
-        borderRadius: scale(8),
-        fontSize: scale(14),
+        padding: scale(12),
+        borderRadius: scale(10),
+        fontSize: scale(15),
     },
     addBtn: {
         backgroundColor: '#004AAD',
-        padding: scale(12),
+        padding: scale(14),
         borderRadius: scale(10),
         alignItems: 'center',
-        marginBottom: scale(10),
     },
-    cancelBtn: {
-        backgroundColor: 'red',
-        padding: scale(12),
-        borderRadius: scale(10),
-        alignItems: 'center',
+    footer: {
+        position: 'absolute',
+        bottom: 0,
+        width: '100%',
+        padding: scale(20),
+        flexDirection: 'row',
+        gap: scale(10),
+        borderTopWidth: 1,
     },
     completeBtn: {
-        backgroundColor: 'green',
-        padding: scale(12),
+        flex: 2,
+        backgroundColor: '#28a745',
+        padding: scale(15),
         borderRadius: scale(10),
         alignItems: 'center',
+        justifyContent: 'center',
     },
-    btnText: {
-        color: '#fff',
-        fontSize: scale(16),
-        fontWeight: '600',
-    },
-    cartRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
+    cancelBtn: {
+        flex: 1,
+        backgroundColor: '#dc3545',
+        padding: scale(15),
+        borderRadius: scale(10),
         alignItems: 'center',
-        marginBottom: scale(8),
-        padding: scale(8),
-        borderRadius: scale(8),
+        justifyContent: 'center',
     },
-    cartItem: {
-        fontSize: scale(14),
-        fontWeight: '500',
+    disabled: { opacity: 0.5 },
+    btnText: { color: '#fff', fontSize: scale(15), fontWeight: 'bold' },
+    cartRow: {
+        marginHorizontal: scale(20),
+        marginVertical: scale(4),
+        padding: scale(12),
+        borderRadius: scale(10),
+        borderWidth: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
     },
-    subText: {
-        fontSize: scale(12),
-        color: '#555',
-        marginLeft: scale(8),
-    },
-    removeText: {
-        color: 'red',
-        fontSize: scale(13),
+    cartItemName: { fontSize: scale(15), fontWeight: '600' },
+    qtyContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(10),
     },
     qtyBtn: {
+        width: scale(28),
+        height: scale(28),
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: '#888',
-        borderRadius: 4,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
+        borderColor: '#ccc',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    qtyText: {
+    qtyValue: {
         fontSize: scale(14),
-        fontWeight: '600',
+        fontWeight: 'bold',
+        minWidth: scale(20),
+        textAlign: 'center',
     },
+    deleteBtn: { marginLeft: scale(10) },
+    deleteText: { color: '#dc3545', fontSize: scale(12), fontWeight: '600' },
     summary: {
         marginTop: scale(20),
-        padding: scale(16),
+        padding: scale(15),
         borderRadius: scale(12),
-        elevation: 2,
     },
-    finalAmount: {
-        fontWeight: 'bold',
-        fontSize: scale(18),
-        marginTop: scale(8),
+    summaryRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 5,
     },
+    totalRow: {
+        borderTopWidth: 1,
+        borderTopColor: '#ccc',
+        paddingTop: 10,
+        marginTop: 5,
+    },
+    finalAmount: { fontSize: scale(18), fontWeight: 'bold' },
+    emptyContainer: { alignItems: 'center', marginTop: scale(40) },
     modalBackground: {
         flex: 1,
-        backgroundColor: '#00000099',
+        backgroundColor: 'rgba(0,0,0,0.7)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     modalContainer: {
-        width: width * 0.8,
-        padding: scale(20),
-        borderRadius: scale(12),
+        width: '80%',
+        padding: scale(25),
+        borderRadius: scale(20),
     },
     modalHeader: {
         fontSize: scale(20),
         fontWeight: 'bold',
-        marginBottom: scale(10),
+        textAlign: 'center',
+        marginBottom: 10,
     },
 })

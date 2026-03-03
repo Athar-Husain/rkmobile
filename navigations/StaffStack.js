@@ -14,6 +14,8 @@ import StaffProfileScreen from '../screens/Staff/StaffProfileScreen'
 import Menu from '../screens/Menu'
 // import Header from '../components/Header'
 import Header from '../containers/Header'
+import StaffPOSScreen from '../screens/Staff/StaffPOSScreen'
+import CategoriesScreen from '../screens/CategoriesScreen'
 
 const Stack = createNativeStackNavigator()
 
@@ -47,6 +49,9 @@ const StaffStack = () => {
                 />
                 <Stack.Screen name="Menu" component={Menu} />
 
+                <Stack.Screen name="StaffPOS" component={StaffPOSScreen} />
+
+                <Stack.Screen name="Categories" component={CategoriesScreen} />
                 <Stack.Screen
                     name="StaffProfile"
                     component={StaffProfileScreen}

@@ -13,10 +13,6 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 // Import all your reducers
-// import customerReducer from './features/Customers/CustomerSlice'
-// import connectionReducer from './features/Connection/ConnectionSlice'
-// import planReducer from './features/Plan/PlanSlice'
-// import ticketReducer from './features/Tickets/TicketSlice'
 import notificationReducer from './features/Notifications/NotificationSlice'
 import authReducer from './features/Auth/AuthSlice'
 import userReducer from './features/Users/UserSlice'
@@ -24,6 +20,11 @@ import cityAreaReducer from './features/CityAreas/CityAreaSlice'
 import couponReducer from './features/Coupons/CouponSlice'
 import storeReducer from './features/Stores/StoreSlice'
 import purchaseReducer from './features/Purchases/PurchaseSlice'
+import productReducer from './features/Products/ProductSlice'
+import homeReducer from './features/Home/HomeSlice'
+
+// Import Promotion Slice
+import promotionReducer from './features/Promotion/PromotionSlice'
 
 // Define persist configs
 const persistConfigs = {
@@ -37,21 +38,36 @@ const persistConfigs = {
         storage: AsyncStorage,
         whitelist: ['list'], // adjust based on your notification state
     },
+    home: {
+        key: 'home',
+        storage: AsyncStorage,
+        whitelist: [
+            'banners',
+            'promotions',
+            'categories',
+            'quickAccess',
+            'featuredProducts',
+        ],
+    },
+    promotions: {
+        key: 'promotions',
+        storage: AsyncStorage,
+        whitelist: ['promotions', 'featuredPromotions', 'isLoading', 'message'],
+    },
 }
 
 // All reducers
 const reducers = {
     auth: authReducer,
     notifications: notificationReducer,
-    // customer: customerReducer,
-    // connection: connectionReducer,
-    // plan: planReducer,
-    // ticket: ticketReducer,
     user: userReducer,
     cityarea: cityAreaReducer,
     coupon: couponReducer,
     store: storeReducer,
     purchase: purchaseReducer,
+    home: homeReducer,
+    product: productReducer,
+    promotions: promotionReducer, // added promotion slice
 }
 
 // Wrap reducers that need persistence automatically
