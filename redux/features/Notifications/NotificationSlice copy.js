@@ -56,20 +56,6 @@ const notificationSlice = createSlice({
     name: 'notifications',
     initialState,
     reducers: {
-        // INDUSTRY STANDARD: Add notification locally when FCM hits
-        addNotification: (state, action) => {
-            const incoming = action.payload
-            // Ensure no duplicate using the ID from your backend LogSchema
-            const exists = state.notifications.some(
-                (n) => n._id === incoming._id
-            )
-
-            if (!exists) {
-                state.notifications = [incoming, ...state.notifications]
-                state.unreadCount += 1
-                state.pagination.total += 1
-            }
-        },
         resetNotificationState: (state) => {
             state.notifications = []
             state.unreadCount = 0
@@ -84,20 +70,16 @@ const notificationSlice = createSlice({
         builder
             .addCase(getNotifications.fulfilled, (state, action) => {
                 state.isNotificationLoading = false
+                // Logic: If page 1, replace. If page > 1, append.
                 const { notifications, unreadCount, pagination } =
                     action.payload
-
                 if (pagination.page === 1) {
                     state.notifications = notifications
                 } else {
-                    // Prevent duplicates when appending pages
-                    const existingIds = new Set(
-                        state.notifications.map((n) => n._id)
-                    )
-                    const uniqueNew = notifications.filter(
-                        (n) => !existingIds.has(n._id)
-                    )
-                    state.notifications = [...state.notifications, ...uniqueNew]
+                    state.notifications = [
+                        ...state.notifications,
+                        ...notifications,
+                    ]
                 }
                 state.unreadCount = unreadCount
                 state.pagination = pagination
@@ -131,7 +113,10 @@ const notificationSlice = createSlice({
                 (state, action) => {
                     state.isNotificationLoading = false
                     state.isNotificationError = true
-                    const msg = getError(action.payload)
+                    const msg =
+                        typeof action.payload === 'string'
+                            ? action.payload
+                            : 'Something went wrong'
                     state.notificationMessage = msg
                     showMessage({ message: msg, type: 'danger' })
                 }
@@ -139,7 +124,5 @@ const notificationSlice = createSlice({
     },
 })
 
-// EXPORT addNotification so useNotifications.js can use it
-export const { resetNotificationState, addNotification } =
-    notificationSlice.actions
+export const { resetNotificationState } = notificationSlice.actions
 export default notificationSlice.reducer

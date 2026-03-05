@@ -5,40 +5,46 @@ import { BASE_API_URL } from '../../../utils/baseurl'
 
 const NOTIFICATION_URL = `${BASE_API_URL}/api/notifications`
 
+// Create the instance
 const axiosInstance = axios.create({
     baseURL: NOTIFICATION_URL,
     headers: { 'Content-Type': 'application/json' },
+    timeout: 10000, // Giant App Standard: Always set a timeout
 })
 
-axiosInstance.interceptors.request.use(async (config) => {
-    const token = await TokenManager.getToken()
-
-    if (token) config.headers.Authorization = `Bearer ${token}`
-
-    config.headers['X-Device-Platform'] = Platform.OS
-    return config
-})
+// Request Interceptor
+axiosInstance.interceptors.request.use(
+    async (config) => {
+        try {
+            const token = await TokenManager.getToken()
+            if (token) {
+                config.headers.Authorization = `Bearer ${token}`
+            }
+            config.headers['X-Device-Platform'] = Platform.OS
+        } catch (e) {
+            // Silence silent failures that lead to undefined calls
+            console.error('Auth Interceptor Error', e)
+        }
+        return config
+    },
+    (error) => Promise.reject(error)
+)
 
 const NotificationService = {
-    // ==========================
-    // GET MY NOTIFICATIONS
-    // ==========================
-    getMyNotifications: (params) =>
-        axiosInstance
-            .get('/my-notifications', { params })
-            .then((res) => res.data),
+    getMyNotifications: async (params) => {
+        const res = await axiosInstance.get('/my-notifications', { params })
+        return res.data
+    },
 
-    // ==========================
-    // MARK SELECTED AS READ
-    // ==========================
-    markNotificationsAsRead: (ids) =>
-        axiosInstance.patch('/read', { ids }).then((res) => res.data),
+    markNotificationsAsRead: async (ids) => {
+        const res = await axiosInstance.patch('/read', { ids })
+        return res.data
+    },
 
-    // ==========================
-    // MARK ALL AS READ
-    // ==========================
-    markAllNotificationsAsRead: () =>
-        axiosInstance.patch('/read-all').then((res) => res.data),
+    markAllNotificationsAsRead: async () => {
+        const res = await axiosInstance.patch('/read-all')
+        return res.data
+    },
 }
 
 export default NotificationService

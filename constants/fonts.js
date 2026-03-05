@@ -1,3 +1,4 @@
+// app/constants/fonts.js
 export const FONTS = {
     black: require("../assets/fonts/Urbanist-Black.ttf"),
     blackItalic: require("../assets/fonts/Urbanist-BlackItalic.ttf"),

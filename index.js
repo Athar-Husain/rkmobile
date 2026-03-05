@@ -16,7 +16,7 @@ const firebaseApp = getApps().length ? getApp() : initializeApp()
 // This is triggered when the app is in the background or quit.
 const messaging = getMessaging(firebaseApp)
 setBackgroundMessageHandler(messaging, async (remoteMessage) => {
-    console.log('📩 Background Data Received:', remoteMessage.data)
+    // console.log('📩 Background Data Received:', remoteMessage.data)
     // Since we use data-only payloads, we MUST manually display the notification
     await displayLocalNotification(remoteMessage)
 })

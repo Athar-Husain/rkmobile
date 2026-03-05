@@ -52,8 +52,8 @@ import AllProducts from '../screens/AllProducts'
 import ProductDetails from '../screens/ProductDetails'
 
 // import SupportTicketDetail from '../screens/SupportTicketDetail'
-import PlansScreen from '../screens/Plans'
-import ConnectionsScreen from '../screens/Connections'
+// import PlansScreen from '../screens/Plans'
+// import ConnectionsScreen from '../screens/Connections'
 import Menu from '../screens/Menu'
 
 const Stack = createNativeStackNavigator()
@@ -135,11 +135,11 @@ const MainStack = () => {
                     name="ServiceDetailsReviews"
                     component={ServiceDetailsReviews}
                 />
-                <Stack.Screen name="Plans" component={PlansScreen} />
-                <Stack.Screen
+                {/* <Stack.Screen name="Plans" component={PlansScreen} /> */}
+                {/* <Stack.Screen
                     name="Connections"
                     component={ConnectionsScreen}
-                />
+                /> */}
                 <Stack.Screen name="BookingStep1" component={BookingStep1} />
                 <Stack.Screen
                     name="BookingDetails"
