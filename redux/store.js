@@ -22,9 +22,9 @@ import storeReducer from './features/Stores/StoreSlice'
 import purchaseReducer from './features/Purchases/PurchaseSlice'
 import productReducer from './features/Products/ProductSlice'
 import homeReducer from './features/Home/HomeSlice'
+import promotionReducer from './features/Promotion/PromotionSlice'
 
 // Import Promotion Slice
-import promotionReducer from './features/Promotion/PromotionSlice'
 
 // Define persist configs
 const persistConfigs = {

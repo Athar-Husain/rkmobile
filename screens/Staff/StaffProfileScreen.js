@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import {
     View,
     Text,
@@ -7,19 +7,29 @@ import {
     ScrollView,
     SafeAreaView,
     StatusBar,
+    Pressable,
 } from 'react-native'
 import { useSelector, useDispatch } from 'react-redux'
 import Feather from 'react-native-vector-icons/Feather'
+import RBSheet from 'react-native-raw-bottom-sheet'
 import { logout } from '../../redux/features/Auth/AuthSlice'
 import { COLORS } from '../../constants'
 import { useTheme } from '../../theme/ThemeProvider'
 
 const StaffProfileScreen = () => {
     const dispatch = useDispatch()
+    const refRBSheet = useRef()
     const { user } = useSelector((state) => state.auth)
     const { dark, colors } = useTheme()
 
-    const handleLogout = () => dispatch(logout())
+    const handleLogout = async () => {
+        try {
+            await dispatch(logout()).unwrap()
+            // The sheet closes automatically as the app state resets to Login
+        } catch (error) {
+            console.error('Logout failed', error)
+        }
+    }
 
     return (
         <SafeAreaView
@@ -92,7 +102,7 @@ const StaffProfileScreen = () => {
                     </View>
                 </View>
 
-                {/* Account Settings Group */}
+                {/* Workplace Group */}
                 <Text style={styles.sectionHeader}>Workplace</Text>
                 <View
                     style={[
@@ -142,13 +152,13 @@ const StaffProfileScreen = () => {
                     />
                 </View>
 
-                {/* Danger Zone */}
+                {/* Updated Logout Button - Triggers Bottom Sheet */}
                 <TouchableOpacity
                     style={[
                         styles.logoutBtn,
                         { backgroundColor: dark ? COLORS.dark2 : '#FFF' },
                     ]}
-                    onPress={handleLogout}
+                    onPress={() => refRBSheet.current.open()}
                 >
                     <Feather name="log-out" size={20} color="#FF3B30" />
                     <Text style={styles.logoutText}>
@@ -166,6 +176,52 @@ const StaffProfileScreen = () => {
                     </Text>
                 </View>
             </ScrollView>
+
+            {/* Confirmation Bottom Sheet */}
+            <RBSheet
+                ref={refRBSheet}
+                closeOnDragDown={true}
+                height={220}
+                customStyles={{
+                    container: {
+                        borderTopRightRadius: 28,
+                        borderTopLeftRadius: 28,
+                        backgroundColor: dark ? '#1C1C1E' : COLORS.white,
+                    },
+                }}
+            >
+                <View style={styles.sheetContent}>
+                    <Text
+                        style={[
+                            styles.sheetTitle,
+                            { color: dark ? COLORS.white : '#000' },
+                        ]}
+                    >
+                        Sign Out?
+                    </Text>
+                    <View style={styles.sheetOptions}>
+                        <Pressable
+                            style={styles.cancelBtn}
+                            onPress={() => refRBSheet.current.close()}
+                        >
+                            <Text
+                                style={[
+                                    styles.cancelText,
+                                    { color: dark ? COLORS.white : '#000' },
+                                ]}
+                            >
+                                Stay Logged In
+                            </Text>
+                        </Pressable>
+                        <Pressable
+                            style={styles.confirmBtn}
+                            onPress={handleLogout}
+                        >
+                            <Text style={styles.confirmText}>Sign Out</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </RBSheet>
         </SafeAreaView>
     )
 }
@@ -229,8 +285,6 @@ const PermissionRow = ({ active, label, dark }) => (
         />
     </View>
 )
-
-export default StaffProfileScreen
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
@@ -311,7 +365,6 @@ const styles = StyleSheet.create({
     rowLabel: { fontSize: 12, color: '#94A3B8', fontWeight: '500' },
     rowValue: { fontSize: 15, fontWeight: '600', marginTop: 2 },
     separator: { height: 1, backgroundColor: '#F1F5F9' },
-
     permissionLabel: { flex: 1, fontSize: 15, fontWeight: '600' },
 
     // Logout
@@ -322,12 +375,38 @@ const styles = StyleSheet.create({
         padding: 16,
         borderRadius: 20,
         gap: 10,
+        marginTop: 10,
         borderWidth: 1,
         borderColor: '#FEE2E2',
     },
     logoutText: { color: '#FF3B30', fontSize: 16, fontWeight: '700' },
 
+    // Sheet
+    sheetContent: { padding: 24, alignItems: 'center' },
+    sheetTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 30 },
+    sheetOptions: { flexDirection: 'row', gap: 12 },
+    cancelBtn: {
+        flex: 1,
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 14,
+        backgroundColor: '#8E8E9320',
+    },
+    confirmBtn: {
+        flex: 1,
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 14,
+        backgroundColor: '#FF3B30',
+    },
+    cancelText: { fontWeight: '600' },
+    confirmText: { color: 'white', fontWeight: 'bold' },
+
     // Footer
     footerInfo: { marginTop: 30, alignItems: 'center' },
     footerText: { fontSize: 12, color: '#94A3B8', marginBottom: 4 },
 })
+
+export default StaffProfileScreen

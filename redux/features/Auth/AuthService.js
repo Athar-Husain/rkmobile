@@ -68,7 +68,6 @@ export const FCMService = {
     getToken: async () => {
         try {
             let fcmToken = await AsyncStorage.getItem('fcm_token')
-            console.log('fcmToken', fcmToken)
             if (fcmToken) return fcmToken
 
             // Safety check for Firebase instance
@@ -197,7 +196,6 @@ const AuthService = {
             const fcmToken = await FCMService.getToken()
             if (!token || !fcmToken) return null
 
-            console.log('finalFcmToken', fcmToken)
             await axiosInstance.post(`/device/register`, {
                 deviceToken: fcmToken,
                 platform: Platform.OS,
