@@ -1,96 +1,131 @@
-import { View, StyleSheet, useWindowDimensions, Text } from 'react-native'
 import React, { useState } from 'react'
+import {
+    View,
+    StyleSheet,
+    useWindowDimensions,
+    Text,
+    StatusBar as RNStatusBar,
+} from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { TabView, SceneMap, TabBar } from 'react-native-tab-view'
+import { TabView, TabBar } from 'react-native-tab-view'
 import { useTheme } from '../theme/ThemeProvider'
 import { COLORS } from '../constants'
-// import HelpCenterHeader from './HelpCenterHeader'
-// import FaqSection from './FaqSection'
-// import SupportTicketsSection from './SupportTicketsSection'
-// import ContactUsSection from './ContactUsSection'
-import { faqs, faqKeywords, supportTickets } from '../data'
+import { faqKeywords, faqs } from '../data'
+
 import FaqSection from '../containers/Help/FaqSection'
-import SupportTicketsSection from '../containers/Help/SupportTicketsSection'
 import ContactUsSection from '../containers/Help/ContactUsSection'
 import HelpCenterHeader from '../containers/Help/HelpCenterHeader'
 
-
-
-
-
-const renderScene = SceneMap({
-    first: () => <FaqSection faqsData={faqs} faqKeywordsData={faqKeywords} />,
-    second: () => <SupportTicketsSection ticketsData={supportTickets} />,
-    third: () => <ContactUsSection />,
-})
-
 const HelpCenter = ({ navigation }) => {
     const layout = useWindowDimensions()
-    const { colors, dark } = useTheme()
-
+    const { dark, colors } = useTheme()
     const [index, setIndex] = useState(0)
+
     const [routes] = useState([
-        { key: 'first', title: 'FAQ' },
-        { key: 'second', title: 'Support' },
-        { key: 'third', title: 'Connect Us' },
+        { key: 'faq', title: 'FAQ' },
+        { key: 'contact', title: 'Contact Us' },
     ])
 
+    const renderScene = ({ route }) => {
+        switch (route.key) {
+            case 'faq':
+                return (
+                    <FaqSection
+                        faqsData={faqs}
+                        faqKeywordsData={faqKeywords}
+                        dark={dark}
+                    />
+                )
+            case 'contact':
+                return <ContactUsSection dark={dark} />
+            default:
+                return null
+        }
+    }
+
     const renderTabBar = (props) => (
-        <TabBar
-            {...props}
-            indicatorStyle={{
-                backgroundColor: COLORS.primary,
-            }}
-            style={{
-                backgroundColor: dark ? COLORS.dark1 : COLORS.white,
-            }}
-            renderLabel={({ route, focused }) => (
-                <Text
-                    style={{
-                        color: focused ? COLORS.primary : 'gray',
-                        fontSize: 16,
-                        fontFamily: 'bold',
-                    }}
-                >
-                    {route.title}
-                </Text>
-            )}
-        />
+        <View
+            style={[
+                styles.tabBarWrapper,
+                { backgroundColor: colors.background },
+            ]}
+        >
+            <TabBar
+                {...props}
+                activeColor={dark ? '#FFFFFF' : '#000000'}
+                inactiveColor={dark ? COLORS.grayscale600 : COLORS.grayscale700}
+                indicatorStyle={[
+                    styles.tabIndicator,
+                    {
+                        backgroundColor: dark ? COLORS.primary : '#FFFFFF',
+                        elevation: dark ? 0 : 3,
+                        shadowOpacity: dark ? 0 : 0.2,
+                    },
+                ]}
+                style={[
+                    styles.tabBar,
+                    { backgroundColor: dark ? COLORS.dark2 : '#E5E5E5' },
+                ]}
+                pressColor="transparent"
+                renderLabel={({ route, focused }) => (
+                    <Text
+                        style={[
+                            styles.tabLabel,
+                            {
+                                color: focused
+                                    ? dark
+                                        ? '#FFFFFF'
+                                        : '#000000'
+                                    : dark
+                                      ? '#8E8E93'
+                                      : '#636366',
+                                fontWeight: focused ? '700' : '600',
+                            },
+                        ]}
+                    >
+                        {route.title}
+                    </Text>
+                )}
+            />
+        </View>
     )
 
     return (
         <SafeAreaView
             style={[styles.area, { backgroundColor: colors.background }]}
         >
-            <View
-                style={[
-                    styles.container,
-                    { backgroundColor: colors.background },
-                ]}
-            >
-                <HelpCenterHeader
-                    onBackPress={() => navigation.goBack()}
-                    dark={dark}
-                />
-                <TabView
-                    navigationState={{ index, routes }}
-                    renderScene={renderScene}
-                    onIndexChange={setIndex}
-                    initialLayout={{ width: layout.width }}
-                    renderTabBar={renderTabBar}
-                />
-            </View>
+            <HelpCenterHeader
+                onBackPress={() => navigation.goBack()}
+                dark={dark}
+            />
+            <TabView
+                navigationState={{ index, routes }}
+                renderScene={renderScene}
+                onIndexChange={setIndex}
+                initialLayout={{ width: layout.width }}
+                renderTabBar={renderTabBar}
+                lazy
+            />
         </SafeAreaView>
     )
 }
 
 const styles = StyleSheet.create({
-    area: {
-        flex: 1,
+    area: { flex: 1 },
+    tabBarWrapper: { paddingHorizontal: 20, paddingVertical: 12 },
+    tabBar: {
+        borderRadius: 16,
+        height: 50,
+        elevation: 0,
+        shadowOpacity: 0,
+        overflow: 'hidden',
     },
-    container: {
-        flex: 1,
-        padding: 16,
+    tabIndicator: { height: '84%', borderRadius: 12, bottom: '8%' },
+    tabLabel: {
+        fontSize: 14,
+        textTransform: 'none',
+        textAlign: 'center',
+        width: '100%',
     },
 })
 

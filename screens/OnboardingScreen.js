@@ -1,214 +1,269 @@
-import React from 'react'
+import React, { useRef, useState } from 'react'
 import {
     View,
     Text,
-    Image,
     StyleSheet,
+    Image,
+    TouchableOpacity,
     Dimensions,
-    Platform,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { useDispatch } from 'react-redux'
-import { images, COLORS } from '../constants'
-import { useTheme } from '../theme/ThemeProvider'
-import PageContainer from '../components/PageContainer'
-import Button from '../components/Button'
-import DotsView from '../components/DotsView'
+import PagerView from 'react-native-pager-view'
+import * as Haptics from 'expo-haptics'
+import { LinearGradient } from 'expo-linear-gradient'
+import Animated, {
+    useSharedValue,
+    useAnimatedStyle,
+    interpolate,
+    Extrapolate,
+    useDerivedValue,
+} from 'react-native-reanimated'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { COLORS, images } from '../constants' // Adjust path
+
 import { markOnboardingComplete } from '../redux/features/Auth/AuthSlice'
+import { useDispatch } from 'react-redux'
 
-// Get screen dimensions
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window')
+const { width } = Dimensions.get('window')
 
-// Some helpful scaling utilities
-const guidelineBaseWidth = 375 // base design width (iPhone X / etc)
-const guidelineBaseHeight = 812 // base design height
+/**
+ * We wrap PagerView in Reanimated's handler to track
+ * the exact swipe position in real-time.
+ */
+const AnimatedPagerView = Animated.createAnimatedComponent(PagerView)
 
-function scale(size) {
-    return (SCREEN_WIDTH / guidelineBaseWidth) * size
-}
-
-function verticalScale(size) {
-    return (SCREEN_HEIGHT / guidelineBaseHeight) * size
-}
-
-function moderateScale(size, factor = 0.5) {
-    return size + (scale(size) - size) * factor
-}
-
-const OnboardingScreen = ({ navigation, data, index, totalScreens }) => {
-    const { colors } = useTheme()
+const OnboardingScreen = ({ navigation, data }) => {
     const dispatch = useDispatch()
+    const pagerRef = useRef(null)
+    const insets = useSafeAreaInsets()
+    const [currentPage, setCurrentPage] = useState(0)
 
-    const isLastScreen = index === totalScreens - 1
+    // Reanimated Shared Values to track swipe progress
+    const scrollOffset = useSharedValue(0)
+    const position = useSharedValue(0)
+
+    /**
+     * Total progress is calculated by combining current page position
+     * and the swipe offset. A value of 1.5 means user is halfway
+     * swiping between page 1 and page 2.
+     */
+    const combinedProgress = useDerivedValue(() => {
+        return position.value + scrollOffset.value
+    })
+
+    const onPageScroll = (e) => {
+        position.value = e.nativeEvent.position
+        scrollOffset.value = e.nativeEvent.offset
+    }
+
+    const onPageSelected = (e) => {
+        const page = e.nativeEvent.position
+        setCurrentPage(page)
+        // HAPTICS UX: Tiny pulse on actual page change
+        Haptics.selectionAsync()
+    }
+    const handleSkip = () => {
+        dispatch(markOnboardingComplete())
+        // navigation.replace('Auth')
+    }
 
     const handleNext = () => {
-        if (isLastScreen) {
-            dispatch(markOnboardingComplete())
-            // navigation.replace('Welcome')
+        if (currentPage < data.length - 1) {
+            // Smoothly animate to the next page
+            pagerRef.current?.setPage(currentPage + 1)
         } else {
-            const nextScreenKey = `Onboarding${index + 2}`
-            navigation.navigate(nextScreenKey)
+            dispatch(markOnboardingComplete())
+            // navigation.replace('Welcome') // Navigate to your fixed Welcome screen
         }
     }
 
-    const handlePrev = () => {
-        if (index === 0) return
-        const prevScreenKey = `Onboarding${index}`
-        navigation.navigate(prevScreenKey)
-    }
+    // ANIMATION STYLE: Text Content
+    const animatedTextContentStyle = useAnimatedStyle(() => {
+        const opacity = interpolate(
+            combinedProgress.value,
+            [currentPage - 1, currentPage, currentPage + 1],
+            [0, 1, 0],
+            Extrapolate.CLAMP
+        )
 
-    const handleSkip = () => {
-        dispatch(markOnboardingComplete())
-        navigation.replace('Auth')
-    }
+        const translateY = interpolate(
+            combinedProgress.value,
+            [currentPage - 1, currentPage, currentPage + 1],
+            [30, 0, -30],
+            Extrapolate.CLAMP
+        )
+
+        return {
+            opacity,
+            transform: [{ translateY }],
+        }
+    })
 
     return (
-        <SafeAreaView
-            style={[styles.safeArea, { backgroundColor: colors.background }]}
-        >
-            <PageContainer>
-                <View style={styles.contentWrapper}>
-                    <Image
-                        source={images[data.imageName]}
-                        resizeMode="contain"
-                        style={[
-                            styles.illustration,
-                            data.tintColor
-                                ? { tintColor: data.tintColor }
-                                : null,
-                        ]}
-                    />
-                    <Image
-                        source={images.ornament}
-                        resizeMode="contain"
-                        style={styles.ornament}
-                    />
+        <View style={styles.container}>
+            {/* Safe Area Top Padding */}
+            <View style={{ height: insets.top }} />
 
-                    <View style={styles.textContainer}>
-                        <Text style={[styles.title, { color: colors.text }]}>
-                            {data.title}
-                        </Text>
-                        <Text style={styles.subTitle}>{data.subTitle}</Text>
-                    </View>
+            {/* Skip Button (Keeps its theme, doesn't animate) */}
+            <TouchableOpacity
+                activeOpacity={0.7}
+                style={styles.skipBtn}
+                onPress={() => handleSkip()}
+            >
+                <Text style={styles.skipText}>Skip</Text>
+            </TouchableOpacity>
 
-                    <Text style={[styles.description, { color: colors.text }]}>
-                        {data.description}
-                    </Text>
+            <AnimatedPagerView
+                ref={pagerRef}
+                style={styles.pagerView}
+                initialPage={0}
+                onPageScroll={onPageScroll}
+                onPageSelected={onPageSelected}
+            >
+                {data.map((item, index) => (
+                    <View key={item.id} style={styles.page}>
+                        {/* 1. Dynamic Background Transition */}
+                        <LinearGradient
+                            colors={item.bgGradient}
+                            style={StyleSheet.absoluteFill}
+                        />
 
-                    <View style={styles.dotsWrapper}>
-                        <DotsView progress={index + 1} numDots={totalScreens} />
-                    </View>
-
-                    <View style={styles.buttonsRow}>
-                        {index > 0 ? (
-                            <Button
-                                title="Previous"
-                                onPress={handlePrev}
-                                textColor={colors.primary}
-                                style={styles.previousButton}
-                            />
-                        ) : (
-                            <View style={styles.previousPlaceholder} />
-                        )}
-
-                        <View style={styles.skipNextRow}>
-                            <Button
-                                title="Skip"
-                                onPress={handleSkip}
-                                textColor={colors.primary}
-                                style={styles.skipButton}
-                            />
-                            <Button
-                                title={isLastScreen ? 'Finish' : 'Next'}
-                                filled
-                                onPress={handleNext}
-                                style={styles.nextButton}
+                        {/* 2. Image Section (Slides natives) */}
+                        <View style={styles.imageContainer}>
+                            <Image
+                                source={images[item.image]}
+                                style={styles.image}
                             />
                         </View>
+
+                        {/* 3. Animated Text Section */}
+                        <Animated.View
+                            style={[
+                                styles.textContainer,
+                                animatedTextContentStyle,
+                            ]}
+                        >
+                            <Text style={styles.title}>{item.title}</Text>
+                            <Text style={styles.subTitle}>{item.subTitle}</Text>
+                            <Text style={styles.description}>
+                                {item.description}
+                            </Text>
+                        </Animated.View>
                     </View>
+                ))}
+            </AnimatedPagerView>
+
+            {/* shared Footer Section */}
+            <View
+                style={[styles.footer, { paddingBottom: insets.bottom + 30 }]}
+            >
+                {/* Dynamic Pagination Dots */}
+                <View style={styles.dotContainer}>
+                    {data.map((_, index) => {
+                        // REANIMATED: Dots animate width during swipe
+                        const dotWidth = useAnimatedStyle(() => {
+                            const width = interpolate(
+                                combinedProgress.value,
+                                [index - 1, index, index + 1],
+                                [8, 20, 8],
+                                Extrapolate.CLAMP
+                            )
+                            const opacity = interpolate(
+                                combinedProgress.value,
+                                [index - 1, index, index + 1],
+                                [0.4, 1, 0.4],
+                                Extrapolate.CLAMP
+                            )
+                            return { width, opacity }
+                        })
+
+                        return (
+                            <Animated.View
+                                key={index}
+                                style={[
+                                    styles.dot,
+                                    dotWidth,
+                                    { backgroundColor: COLORS.primary },
+                                ]}
+                            />
+                        )
+                    })}
                 </View>
-            </PageContainer>
-        </SafeAreaView>
+
+                {/* Modern LinearGradient Button */}
+                <TouchableOpacity onPress={handleNext}>
+                    <LinearGradient
+                        colors={[COLORS.primary, '#335EF7']}
+                        style={styles.nextBtn}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                    >
+                        <Text style={styles.nextBtnText}>
+                            {currentPage === data.length - 1
+                                ? 'Get Started'
+                                : 'Next'}
+                        </Text>
+                    </LinearGradient>
+                </TouchableOpacity>
+            </View>
+        </View>
     )
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
+    container: { flex: 1, backgroundColor: '#FFF' },
+    skipBtn: {
+        alignSelf: 'flex-end',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        zIndex: 10,
     },
-    contentWrapper: {
-        flex: 1,
-        width: '100%',
-        paddingHorizontal: scale(20),
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingVertical: verticalScale(20),
-    },
-    illustration: {
-        width: '100%',
-        height: verticalScale(250),
-        marginTop: verticalScale(20),
-    },
-    ornament: {
-        width: scale(120),
-        height: verticalScale(40),
-        position: 'absolute',
-        top: verticalScale(30),
-        left: scale(20),
-    },
-    textContainer: {
-        width: '100%',
-        alignItems: 'center',
-        marginBottom: verticalScale(10),
-    },
+    skipText: { fontSize: 16, color: '#A0A3BD', fontWeight: '700' },
+    pagerView: { flex: 1 },
+    page: { alignItems: 'center', position: 'relative' },
+    imageContainer: { flex: 0.55, justifyContent: 'center', marginTop: -20 },
+    image: { width: 280, height: 280, resizeMode: 'contain' },
+    textContainer: { flex: 0.4, alignItems: 'center', paddingHorizontal: 30 },
     title: {
-        fontSize: moderateScale(24),
+        fontSize: 13,
         textAlign: 'center',
-        fontFamily: 'bold',
+        color: '#64748B',
+        fontFamily: 'regular',
+        letterSpacing: 1,
+        textTransform: 'uppercase',
     },
     subTitle: {
-        fontSize: moderateScale(20),
+        fontSize: 32,
+        fontWeight: '900',
+        color: COLORS.black,
+        marginTop: 4,
+        letterSpacing: -1,
         textAlign: 'center',
-        marginTop: verticalScale(5),
-        fontFamily: 'semiBold',
     },
     description: {
-        fontSize: moderateScale(16),
+        fontSize: 16,
         textAlign: 'center',
-        marginTop: verticalScale(10),
+        color: '#64748B',
+        lineHeight: 26,
+        marginTop: 15,
+        fontFamily: 'regular',
     },
-    dotsWrapper: {
-        marginTop: verticalScale(20),
-    },
-    buttonsRow: {
-        width: '100%',
+    footer: {
+        paddingHorizontal: 24,
         flexDirection: 'row',
-        alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: verticalScale(30),
-    },
-    previousButton: {
-        paddingHorizontal: scale(15),
-        paddingVertical: verticalScale(10),
-        borderRadius: scale(25),
-    },
-    previousPlaceholder: {
-        width: scale(100), // same as approx size of Previous
-    },
-    skipNextRow: {
-        flexDirection: 'row',
         alignItems: 'center',
+        position: 'absolute',
+        bottom: 0,
+        width: '100%',
     },
-    skipButton: {
-        marginRight: scale(10),
-        paddingHorizontal: scale(15),
-        paddingVertical: verticalScale(10),
-        borderRadius: scale(25),
-    },
-    nextButton: {
-        paddingHorizontal: scale(20),
-        paddingVertical: verticalScale(12),
-        borderRadius: scale(25),
+    dotContainer: { flexDirection: 'row' },
+    dot: { height: 8, borderRadius: 4, marginHorizontal: 4 },
+    nextBtn: { paddingHorizontal: 32, paddingVertical: 18, borderRadius: 20 },
+    nextBtnText: {
+        color: '#FFF',
+        fontSize: 16,
+        fontWeight: '900',
+        letterSpacing: 1,
     },
 })
 

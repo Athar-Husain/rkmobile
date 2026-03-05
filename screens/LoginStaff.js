@@ -28,12 +28,6 @@ import { COLORS, icons, images } from '../constants'
 import { useTheme } from '../theme/ThemeProvider'
 
 // Redux
-// import {
-//     staffSigninSendOTP,
-//     staffSigninVerifyOTP,
-//     clearError,
-// } from '../redux/features/Auth/authSlice'
-// import { FCMService } from '../redux/features/Staff/AuthService'
 import {
     clearError,
     signinStaffSendOTP,
@@ -65,6 +59,7 @@ const LoginStaff = () => {
         setValue,
         formState: { errors },
     } = useForm({
+        mode: 'onTouched', // Professional fix: Validates as user moves through fields
         defaultValues: { emailOrMobile: '' },
     })
 
@@ -82,21 +77,22 @@ const LoginStaff = () => {
     }, [])
 
     useEffect(() => {
+        let timer
         if (countdown > 0) {
-            const timer = setTimeout(() => setCountdown(countdown - 1), 1000)
-            return () => clearTimeout(timer)
+            timer = setTimeout(() => setCountdown(countdown - 1), 1000)
         }
+        return () => clearTimeout(timer)
     }, [countdown])
 
     useEffect(() => {
         if (isLoggedIn) {
-            // navigation.reset({ index: 0, routes: [{ name: 'StaffMainTabs' }] })
-            console.log('logged in Succesfully')
+            console.log('Logged in Successfully')
+            // navigation.reset({ index: 0, routes: [{ name: 'StaffMainTabs' }] });
         }
         return () => {
             dispatch(clearError())
         }
-    }, [isLoggedIn])
+    }, [isLoggedIn, dispatch])
 
     const loadRememberedCredentials = async () => {
         try {
@@ -158,7 +154,7 @@ const LoginStaff = () => {
                 })
             ).unwrap()
         } catch (error) {
-            setOtpCode('')
+            setOtpCode('') // Clear OTP on failure for retry
         } finally {
             setLoading(false)
         }
@@ -191,11 +187,12 @@ const LoginStaff = () => {
                             message: 'Enter a valid email or 10-digit mobile',
                         },
                     }}
-                    render={({ field: { onChange, value } }) => (
+                    render={({ field: { onChange, onBlur, value } }) => (
                         <Input
                             placeholder="Email or Mobile Number"
                             icon={icons.user}
                             value={value}
+                            onBlur={onBlur} // Fixed validation trigger
                             onInputChanged={(_, v) => onChange(v)}
                             errorText={errors.emailOrMobile?.message}
                             autoCapitalize="none"
@@ -221,13 +218,13 @@ const LoginStaff = () => {
                             Remember Me
                         </Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                    // onPress={() =>
-                    //     navigation.navigate('StaffForgotPassword')
-                    // }
+                    {/* <TouchableOpacity
+                        onPress={() => {
+                            navigation.navigate('StaffForgotPassword') 
+                        }}
                     >
                         <Text style={styles.linkText}>Forgot Password?</Text>
-                    </TouchableOpacity>
+                    </TouchableOpacity> */}
                 </View>
 
                 <Button
@@ -243,13 +240,12 @@ const LoginStaff = () => {
 
             <View style={styles.footer}>
                 <Text style={{ color: colors.text, fontSize: 15 }}>
-                    Don't have a staff account?{' '}
+                    Not a staff ?
                 </Text>
-                <TouchableOpacity
-                    onPress={() => navigation.navigate('Signup')}
-                >
+
+                <TouchableOpacity onPress={() => navigation.navigate('Login')}>
                     <Text style={[styles.linkText, { fontSize: 15 }]}>
-                        Customer Sign Up
+                        Customer Login
                     </Text>
                 </TouchableOpacity>
             </View>
@@ -373,7 +369,12 @@ const styles = StyleSheet.create({
     checkboxRow: { flexDirection: 'row', alignItems: 'center' },
     checkbox: { width: 20, height: 20, borderRadius: 6 },
     optionLabel: { marginLeft: 10, fontSize: 14, fontWeight: '500' },
-    linkText: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
+    linkText: {
+        color: COLORS.primary,
+        fontWeight: '700',
+        fontSize: 14,
+        paddingHorizontal: 15,
+    },
     mainBtn: { marginTop: 10, borderRadius: 32, height: 56 },
     footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 40 },
     otpSection: { marginVertical: 30, width: '100%' },

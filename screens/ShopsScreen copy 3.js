@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import {
     View,
     Text,
@@ -9,308 +9,290 @@ import {
     Platform,
     Image,
     Dimensions,
+    ActivityIndicator,
+    SafeAreaView,
+    RefreshControl,
+    StatusBar,
 } from 'react-native'
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
+import { useSelector, useDispatch } from 'react-redux'
+import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient' // Added from your package
+import * as Haptics from 'expo-haptics' // Added from your package
+import * as Clipboard from 'expo-clipboard' // Added from your package
+import { fetchStores } from '../redux/features/Stores/StoreSlice'
 
 const { width } = Dimensions.get('window')
+const MAPBOX_TOKEN = 'YOUR_MAPBOX_TOKEN'
 
 const ShopsScreen = () => {
-    const shops = [
-        {
-            id: '1',
-            name: 'RK Electronics - Main Branch',
-            address: 'Cowl Bazaar, Ballari',
-            phone: '+919876543210',
-            lat: 15.1394,
-            lng: 76.9214,
-            type: 'Retail Store',
-            hours: '9:00 AM - 9:00 PM',
-        },
-        {
-            id: '2',
-            name: 'RK Electronics - Sirguppa ',
-            address: 'Station Road, Ballari',
-            phone: '+919876543211',
-            lat: 15.145,
-            lng: 76.924,
-            type: 'Support & Repair',
-            hours: '10:00 AM - 7:00 PM',
-        },
-        {
-            id: '3',
-            name: 'RK Electronics - Hospet',
-            address: 'Station Road, Ballari',
-            phone: '+919876543211',
-            lat: 15.145,
-            lng: 76.924,
-            type: 'Support & Repair',
-            hours: '10:00 AM - 7:00 PM',
-        },
-    ]
+    const dispatch = useDispatch()
+    const { stores, isStoreLoading } = useSelector((state) => state.store)
+    const [selectedShop, setSelectedShop] = useState(null)
+    const [refreshing, setRefreshing] = useState(false)
 
-    const [selectedShop, setSelectedShop] = useState(shops[0])
+    useEffect(() => {
+        dispatch(fetchStores())
+    }, [dispatch])
 
-    const openNativeMap = () => {
-        const { lat, lng, name } = selectedShop
-        const scheme = Platform.select({
-            ios: 'maps:0,0?q=',
-            android: 'geo:0,0?q=',
-        })
-        const latLng = `${lat},${lng}`
-        const url = Platform.select({
-            ios: `${scheme}${name}@${latLng}`,
-            android: `${scheme}${latLng}(${name})`,
-        })
+    useEffect(() => {
+        if (stores?.length > 0 && !selectedShop) setSelectedShop(stores[0])
+    }, [stores])
+
+    const handleSelectShop = (item) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light) // Premium feel
+        setSelectedShop(item)
+    }
+
+    const copyToClipboard = async (address) => {
+        await Clipboard.setStringAsync(address)
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+        // You can trigger your flash message here if you want
+    }
+
+    const openInGoogleMaps = (shop) => {
+        const target = shop || selectedShop
+        if (!target) return
+        const url =
+            target.location.gmapsLink ||
+            `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(target.location.address)}`
         Linking.openURL(url)
     }
 
-    const makeCall = (phoneNumber) => {
-        Linking.openURL(`tel:${phoneNumber}`)
-    }
-
     const renderShopCard = ({ item }) => {
-        const isSelected = selectedShop.id === item.id
+        const isActive = selectedShop?._id === item._id
+
         return (
             <TouchableOpacity
-                activeOpacity={0.7}
-                style={[styles.listCard, isSelected && styles.selectedListCard]}
-                onPress={() => setSelectedShop(item)}
+                activeOpacity={0.8}
+                onPress={() => handleSelectShop(item)}
+                style={[styles.card, isActive && styles.cardActive]}
             >
                 <View
                     style={[
-                        styles.iconBox,
-                        { backgroundColor: isSelected ? '#004AAD' : '#F0F5FF' },
+                        styles.indicator,
+                        { backgroundColor: isActive ? '#4285F4' : '#E1E8EE' },
                     ]}
-                >
-                    <MaterialCommunityIcons
-                        name={item.id === '1' ? 'store-check' : 'hammer-wrench'}
-                        size={24}
-                        color={isSelected ? '#fff' : '#004AAD'}
-                    />
-                </View>
+                />
 
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.shopType}>{item.type}</Text>
-                    <Text style={styles.shopName}>{item.name}</Text>
-                    <Text style={styles.shopAddr} numberOfLines={1}>
-                        {item.address}
-                    </Text>
-                </View>
+                <View style={styles.cardMain}>
+                    <View style={styles.cardHeader}>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.shopType}>{item.type}</Text>
+                            <Text style={styles.shopName}>{item.name}</Text>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.mapActionBtn}
+                            onPress={() => openInGoogleMaps(item)}
+                        >
+                            <MaterialCommunityIcons
+                                name="google-maps"
+                                size={22}
+                                color="#EA4335"
+                            />
+                        </TouchableOpacity>
+                    </View>
 
-                <TouchableOpacity
-                    style={styles.circleCallBtn}
-                    onPress={() => makeCall(item.phone)}
-                >
-                    <MaterialCommunityIcons
-                        name="phone"
-                        size={20}
-                        color="#004AAD"
-                    />
-                </TouchableOpacity>
+                    <TouchableOpacity
+                        onLongPress={() =>
+                            copyToClipboard(item.location.address)
+                        }
+                    >
+                        <Text style={styles.shopAddress} numberOfLines={1}>
+                            {item.location.address}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <View style={styles.cardFooter}>
+                        <View style={styles.timingRow}>
+                            <MaterialCommunityIcons
+                                name="clock-outline"
+                                size={12}
+                                color="#999"
+                            />
+                            <Text style={styles.timingSmall}>
+                                {item.timings.open} - {item.timings.close}
+                            </Text>
+                        </View>
+                        <TouchableOpacity
+                            onPress={() =>
+                                Linking.openURL(`tel:${item.contact.phone}`)
+                            }
+                        >
+                            <Text style={styles.callText}>Call Store</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
             </TouchableOpacity>
         )
     }
 
     return (
-        <View style={styles.container}>
-            <View style={styles.topHeader}>
-                <Text style={styles.header}>Our Presence</Text>
-                <Text style={styles.subHeader}>
-                    Visit us in Ballari for exclusive deals
-                </Text>
+        <SafeAreaView style={styles.container}>
+            <StatusBar barStyle="dark-content" />
+
+            <View style={styles.navHeader}>
+                <Text style={styles.navSubtitle}>RK ELECTRONICS</Text>
+                <Text style={styles.navTitle}>Store Locator</Text>
             </View>
 
-            {/* INTERACTIVE MAP PLACEHOLDER */}
-            <View style={styles.mapWrapper}>
-                <TouchableOpacity
-                    activeOpacity={0.9}
-                    style={styles.mapPlaceholder}
-                    onPress={openNativeMap}
-                >
-                    <Image
-                        source={{
-                            uri: `https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s+ff0000(${selectedShop.lng},${selectedShop.lat})/${selectedShop.lng},${selectedShop.lat},14/600x400?access_token=pk.eyJ1IjoiZGVtbyIsImEiOiJjaWp6eXp6ZzAwMDBidW5sdTF4MTZ4NXNxIn0`,
-                        }}
-                        style={styles.mapImage}
-                    />
-                    <View style={styles.mapOverlay}>
-                        <View style={styles.markerContainer}>
-                            <View style={styles.markerPulse} />
-                            <MaterialCommunityIcons
-                                name="map-marker-radius"
-                                size={44}
-                                color="#004AAD"
-                            />
+            {selectedShop && (
+                <View style={styles.mapWrapper}>
+                    <View style={styles.mapHero}>
+                        <Image
+                            style={styles.mapImg}
+                            source={{
+                                uri: 'https://content3.jdmagicbox.com/v2/comp/bellary/dc/9999p8392.8392.131002154111.v8d2dc/catalogue/r-k-electronics-brahmin-street-bellary-bellary-electronic-goods-showrooms-rl150r00s3.jpg',
+                            }}
+                        />
+                        {/* Gradient makes the white text pop */}
+                        <LinearGradient
+                            colors={['transparent', 'rgba(0,0,0,0.8)']}
+                            style={styles.gradient}
+                        />
+
+                        <View style={styles.mapContent}>
+                            <Text style={styles.heroName}>
+                                {selectedShop.name}
+                            </Text>
+                            <Text style={styles.heroSub}>
+                                {selectedShop.location.area},{' '}
+                                {selectedShop.location.city}
+                            </Text>
                         </View>
 
-                        <View style={styles.directionsFloatingBtn}>
+                        <TouchableOpacity
+                            style={styles.fab}
+                            onPress={() => openInGoogleMaps()}
+                        >
                             <MaterialCommunityIcons
-                                name="navigation-variant"
-                                size={15}
-                                color="#fff"
+                                name="directions"
+                                size={22}
+                                color="#FFF"
                             />
-                            <Text style={styles.directionsText}></Text>
-                        </View>
+                        </TouchableOpacity>
                     </View>
-
-                    <View style={styles.shopDetailsOverlay}>
-                        <View style={styles.statusBadge}>
-                            <View style={styles.greenDot} />
-                            <Text style={styles.statusText}>Open Now</Text>
-                        </View>
-                        <Text style={styles.overlayShopName}>
-                            {selectedShop.name}
-                        </Text>
-                        <Text style={styles.hoursText}>
-                            {selectedShop.hours}
-                        </Text>
-                    </View>
-                </TouchableOpacity>
-            </View>
+                </View>
+            )}
 
             <FlatList
-                data={shops}
+                data={stores}
                 renderItem={renderShopCard}
-                keyExtractor={(item) => item.id}
-                contentContainerStyle={{
-                    paddingHorizontal: 20,
-                    paddingBottom: 30,
-                }}
+                keyExtractor={(item) => item._id}
+                contentContainerStyle={styles.list}
                 ListHeaderComponent={
-                    <Text style={styles.listTitle}>Select a Location</Text>
+                    <Text style={styles.listLabel}>Available Branches</Text>
+                }
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={() => dispatch(fetchStores())}
+                    />
                 }
             />
-        </View>
+        </SafeAreaView>
     )
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8F9FB' },
-    topHeader: { marginTop: 20, marginHorizontal: 20, marginBottom: 10 },
-    header: { fontSize: 20, fontWeight: 'bold', color: '#1A1A1A' },
-    subHeader: { fontSize: 14, color: '#7C7C7C', marginTop: 4 },
-    listTitle: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#444',
+    container: { flex: 1, backgroundColor: '#FFF' },
+    navHeader: { paddingHorizontal: 24, paddingVertical: 15 },
+    navSubtitle: {
+        fontSize: 10,
+        fontWeight: '800',
+        color: '#4285F4',
+        letterSpacing: 1.5,
+    },
+    navTitle: { fontSize: 28, fontWeight: '900', color: '#1A1A1A' },
+
+    mapWrapper: { paddingHorizontal: 20, marginBottom: 15 },
+    mapHero: {
+        height: 200,
+        borderRadius: 28,
+        overflow: 'hidden',
+        backgroundColor: '#F8F9FA',
+    },
+    mapImg: { width: '100%', height: '100%' },
+    gradient: { ...StyleSheet.absoluteFillObject },
+
+    mapContent: { position: 'absolute', bottom: 20, left: 20 },
+    heroName: { color: '#FFF', fontSize: 18, fontWeight: '800' },
+    heroSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 2 },
+
+    fab: {
+        position: 'absolute',
+        top: 20,
+        right: 20,
+        backgroundColor: '#4285F4',
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+    },
+
+    list: { paddingHorizontal: 20, paddingBottom: 50 },
+    listLabel: {
+        fontSize: 11,
+        fontWeight: '800',
+        color: '#A0A0A0',
+        textTransform: 'uppercase',
         marginBottom: 15,
     },
 
-    mapWrapper: {
-        shadowColor: '#004AAD',
-        shadowOffset: { width: 0, height: 15 },
-        shadowOpacity: 0.15,
-        shadowRadius: 20,
-        elevation: 10,
-    },
-    mapPlaceholder: {
-        height: 200,
-        margin: 20,
-        borderRadius: 28,
-        overflow: 'hidden',
-        backgroundColor: '#E0E0E0',
-    },
-    mapImage: { width: '100%', height: '100%' },
-    mapOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.05)',
-    },
-
-    markerContainer: { alignItems: 'center', justifyContent: 'center' },
-    markerPulse: {
-        position: 'absolute',
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: 'rgba(0, 74, 173, 0.15)',
-    },
-
-    directionsFloatingBtn: {
-        position: 'absolute',
-        bottom: 20,
-        right: 20,
-        backgroundColor: '#004AAD',
+    card: {
         flexDirection: 'row',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        borderRadius: 16,
-        alignItems: 'center',
-    },
-    directionsText: { color: '#fff', fontWeight: 'semibold', marginLeft: 8 },
-
-    shopDetailsOverlay: {
-        position: 'absolute',
-        top: 10,
-        left: 10,
-        backgroundColor: '#fff',
-        padding: 10,
-        borderRadius: 10,
-        width: '65%',
-        elevation: 5,
-    },
-    statusBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 4,
-    },
-    greenDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: '#4CAF50',
-        marginRight: 6,
-    },
-    statusText: {
-        fontSize: 10,
-        fontWeight: 'bold',
-        color: '#4CAF50',
-        letterSpacing: 0.5,
-    },
-    overlayShopName: { fontWeight: 'bold', color: '#1A1A1A', fontSize: 14 },
-    hoursText: { fontSize: 11, color: '#777', marginTop: 2 },
-
-    listCard: {
-        flexDirection: 'row',
-        backgroundColor: '#fff',
-        padding: 15,
-        borderRadius: 22,
-        alignItems: 'center',
+        backgroundColor: '#FFF',
+        borderRadius: 20,
         marginBottom: 12,
-        elevation: 2,
+        borderWidth: 1,
+        borderColor: '#F0F2F5',
     },
-    selectedListCard: {
-        borderWidth: 1.5,
-        borderColor: '#004AAD',
-        backgroundColor: '#fff',
+    cardActive: { borderColor: '#4285F4', backgroundColor: '#F9FBFF' },
+    indicator: {
+        width: 5,
+        borderTopLeftRadius: 20,
+        borderBottomLeftRadius: 20,
     },
-    iconBox: {
-        width: 50,
-        height: 50,
-        borderRadius: 15,
-        justifyContent: 'center',
+    cardMain: { flex: 1, padding: 16 },
+    cardHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        marginRight: 15,
     },
     shopType: {
-        fontSize: 10,
-        fontWeight: 'bold',
-        color: '#004AAD',
-        marginBottom: 2,
+        fontSize: 9,
+        fontWeight: '800',
+        color: '#4285F4',
         textTransform: 'uppercase',
     },
-    shopName: { fontWeight: 'bold', fontSize: 14, color: '#333' },
-    shopAddr: { fontSize: 13, color: '#888', marginTop: 2 },
-    circleCallBtn: {
+    shopName: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
+    mapActionBtn: {
         width: 40,
         height: 40,
-        borderRadius: 20,
-        backgroundColor: '#F0F5FF',
+        borderRadius: 12,
+        backgroundColor: '#F8F9FA',
         justifyContent: 'center',
         alignItems: 'center',
-        marginLeft: 10,
     },
+    shopAddress: { fontSize: 12, color: '#666', marginTop: 4 },
+    cardFooter: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginTop: 12,
+    },
+    timingRow: { flexDirection: 'row', alignItems: 'center' },
+    timingSmall: {
+        fontSize: 11,
+        color: '#999',
+        fontWeight: '600',
+        marginLeft: 4,
+    },
+    callText: { fontSize: 12, fontWeight: '700', color: '#4285F4' },
 })
 
 export default ShopsScreen

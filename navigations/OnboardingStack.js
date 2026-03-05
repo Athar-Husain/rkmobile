@@ -1,70 +1,58 @@
 import React from 'react'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import OnboardingScreen from '../screens/OnboardingScreen'
-// import OnboardingScreen from '../OnboardingScreen'
+import { COLORS } from '../constants' // Adjust based on your constants path
+import { StatusBar } from 'expo-status-bar'
+import { View } from 'react-native'
 
 const Stack = createNativeStackNavigator()
 
-// Data for all onboarding screens
-const onboardingData = [
+/**
+ * PRODUCTION TIP: Add dynamic data for colors to create smooth
+ * transitions. Using your constants list.
+ */
+export const ONBOARDING_DATA = [
     {
-        key: 'Onboarding1',
+        id: 1,
         title: 'Welcome to',
-        subTitle: 'MW FiberNet',
+        subTitle: 'RK Electronics',
         description:
-            "We're here to make your life easier by connecting you with top-notch service providers for all your home needs.",
-        // imageName: 'onboarding1',
-        imageName: 'logo',
+            'Your trusted partner for genuine electronics and reliable home services, right at your doorstep.',
+        image: 'logo',
+        bgGradient: ['#FFF', '#F0F5FF'], // Starts here
     },
     {
-        key: 'Onboarding2',
+        id: 2,
         title: 'Enjoy the convenience of',
-        subTitle: 'CONVENIENCE',
+        subTitle: 'HOME SERVICES',
         description:
-            "Access home services whenever and wherever you need them. From routine maintenance to emergency repairs, we've got you covered.",
-        // imageName: 'onboarding2',
-        imageName: 'logo',
+            'From routine maintenance to emergency repairs, discover trusted professionals ready to tackle any task.',
+        image: 'logo',
+        bgGradient: ['#F0F5FF', '#F9F0FF'], // Transitions to this
     },
     {
-        key: 'Onboarding3',
-        title: 'Efficient',
-        subTitle: 'A Reliable Service',
+        id: 3,
+        title: 'Discover exclusive',
+        subTitle: 'OFFERS & DEALS',
         description:
-            'Discover a network of trusted professionals ready to tackle any task, ensuring your home is always in tip-top shape.',
-        imageName: 'logo',
-        // imageName: 'onboarding3',
-    },
-    {
-        key: 'Onboarding4',
-        title: 'Premium Wifi',
-        subTitle: 'MW FiberNet',
-        description:
-            'Let us handle the chores, so you can focus on what matters most.',
-        imageName: 'logo',
-        // imageName: 'onboarding4',
+            'Unlock premium discounts on appliances and services. Let us handle the chores, so you can focus on life.',
+        image: 'logo',
+        bgGradient: ['#F9F0FF', '#FFF'], // Transitions back
     },
 ]
 
 const OnboardingStack = () => {
     return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-            {onboardingData.map((screenData, index) => (
-                <Stack.Screen
-                    key={screenData.key}
-                    name={screenData.key}
-                    options={{ animation: 'slide_from_right' }}
-                >
+        <View style={{ flex: 1 }}>
+            <StatusBar style="dark" />
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="OnboardingMain">
                     {(props) => (
-                        <OnboardingScreen
-                            {...props}
-                            data={screenData}
-                            index={index}
-                            totalScreens={onboardingData.length}
-                        />
+                        <OnboardingScreen {...props} data={ONBOARDING_DATA} />
                     )}
                 </Stack.Screen>
-            ))}
-        </Stack.Navigator>
+            </Stack.Navigator>
+        </View>
     )
 }
 

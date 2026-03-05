@@ -1,3 +1,4 @@
+//theme/ThemeProvider.js
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useColorScheme } from 'react-native'
 import { lightColors, darkColors } from './colors'

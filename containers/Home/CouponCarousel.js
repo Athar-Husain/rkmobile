@@ -1,5 +1,4 @@
-// app/containers/Home/CouponCarousel.js
-import React, { useRef } from 'react'
+import React, { useRef, memo } from 'react'
 import {
     View,
     Text,
@@ -8,33 +7,51 @@ import {
     ActivityIndicator,
     Dimensions,
     Animated,
+    Platform,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import moment from 'moment'
+import * as Haptics from 'expo-haptics'
+import { useNavigation } from '@react-navigation/native'
 import { COLORS } from '../../constants'
 
 const { width } = Dimensions.get('window')
-const CARD_WIDTH = width * 0.85
-const SPACING = 15
+const CARD_WIDTH = width * 0.82
+const SPACING = 10
 
 const CouponCarousel = ({ data, isLoading, onViewAll }) => {
+    const navigation = useNavigation();
     const scrollX = useRef(new Animated.Value(0)).current
 
     if (isLoading && (!data || data.length === 0)) {
         return (
             <View style={styles.loader}>
-                <ActivityIndicator color={COLORS.primary} />
+                <ActivityIndicator size="small" color={COLORS.primary} />
             </View>
         )
     }
+    
     if (!data || data.length === 0) return null
 
     const formatExpiry = (dateStr) => {
         const daysLeft = moment(dateStr).diff(moment(), 'days')
         if (daysLeft < 0) return 'Expired'
-        if (daysLeft === 0) return 'Expires Today'
-        return `${daysLeft} days remaining`
+        if (daysLeft === 0) return 'Ends Today'
+        return `${daysLeft}d left`
+    }
+
+    const handleNavigation = (item) => {
+        if (Platform.OS !== 'web') {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
+        }
+        
+        // Determine which tab to open: active if it's already claimed, discover if not
+        const targetTab = item.status ? 'active' : 'discover';
+        
+        navigation.navigate('Coupons', { 
+            initialTab: targetTab 
+        });
     }
 
     return (
@@ -43,7 +60,7 @@ const CouponCarousel = ({ data, isLoading, onViewAll }) => {
                 <View>
                     <Text style={styles.sectionTitle}>Exclusive Rewards</Text>
                     <Text style={styles.subTitle}>
-                        Save more on your favorites
+                        Unlock savings on your next order
                     </Text>
                 </View>
                 <TouchableOpacity onPress={onViewAll} style={styles.viewAllBtn}>
@@ -70,52 +87,38 @@ const CouponCarousel = ({ data, isLoading, onViewAll }) => {
                         (index + 1) * (CARD_WIDTH + SPACING),
                     ]
 
-                    const scale = scrollX.interpolate({
-                        inputRange,
-                        outputRange: [0.9, 1, 0.9],
-                        extrapolate: 'clamp',
-                    })
-
                     const opacity = scrollX.interpolate({
                         inputRange,
-                        outputRange: [0.7, 1, 0.7],
+                        outputRange: [0.6, 1, 0.6],
                         extrapolate: 'clamp',
                     })
 
                     return (
                         <Animated.View
                             key={item._id || index}
-                            style={[
-                                styles.cardWrapper,
-                                { transform: [{ scale }], opacity },
-                            ]}
+                            style={[styles.cardWrapper, { opacity }]}
                         >
                             <LinearGradient
-                                colors={['#1e3c72', '#2a5298', '#1a1a1a']}
+                                colors={['#1A2980', '#26D0CE']}
                                 start={{ x: 0, y: 0 }}
-                                end={{ x: 1, y: 1 }}
+                                end={{ x: 1, y: 0 }}
                                 style={styles.card}
                             >
-                                {/* Left Side: Discount Info */}
                                 <View style={styles.leftPortion}>
                                     <Text style={styles.discountValue}>
                                         {item.type !== 'FIXED_AMOUNT'
                                             ? `${item.value}%`
                                             : `₹${item.value}`}
                                     </Text>
-                                    <Text style={styles.offLabel}>
-                                        CASHBACK
-                                    </Text>
+                                    <Text style={styles.offLabel}>REWARD</Text>
                                 </View>
 
-                                {/* Center: Ticket Perforation */}
                                 <View style={styles.dividerContainer}>
                                     <View style={styles.circleNotchTop} />
                                     <View style={styles.dashedLine} />
                                     <View style={styles.circleNotchBottom} />
                                 </View>
 
-                                {/* Right Side: Content */}
                                 <View style={styles.rightPortion}>
                                     <View>
                                         <Text
@@ -125,7 +128,7 @@ const CouponCarousel = ({ data, isLoading, onViewAll }) => {
                                             {item.title}
                                         </Text>
                                         <Text style={styles.minSpend}>
-                                            On orders above ₹
+                                            Min. spend ₹
                                             {item.minPurchaseAmount || 0}
                                         </Text>
                                     </View>
@@ -133,20 +136,21 @@ const CouponCarousel = ({ data, isLoading, onViewAll }) => {
                                     <View style={styles.footer}>
                                         <View style={styles.expiryBox}>
                                             <MaterialCommunityIcons
-                                                name="timer-sand"
-                                                size={14}
-                                                color="#FFD700"
+                                                name="clock-outline"
+                                                size={12}
+                                                color="#FFF"
                                             />
                                             <Text style={styles.expiryText}>
                                                 {formatExpiry(item.validUntil)}
                                             </Text>
                                         </View>
                                         <TouchableOpacity
-                                            activeOpacity={0.8}
-                                            style={styles.shopBtn}
+                                            onPress={() => handleNavigation(item)}
+                                            activeOpacity={0.7}
+                                            style={styles.applyBtn}
                                         >
-                                            <Text style={styles.shopBtnText}>
-                                                APPLY
+                                            <Text style={styles.applyBtnText}>
+                                                {item.status ? 'VIEW' : 'CLAIM'}
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
@@ -161,58 +165,58 @@ const CouponCarousel = ({ data, isLoading, onViewAll }) => {
 }
 
 const styles = StyleSheet.create({
-    container: { marginVertical: 15 },
+    container: { marginVertical: 10 },
     headerRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'flex-end',
+        alignItems: 'center',
         paddingHorizontal: 20,
-        marginBottom: 15,
+        marginBottom: 12,
     },
-    sectionTitle: { fontSize: 20, fontWeight: '800', color: '#1a1a1a' },
-    subTitle: { fontSize: 12, color: '#666', marginTop: 2 },
-    viewAllBtn: {
-        paddingVertical: 4,
-        paddingHorizontal: 10,
-        backgroundColor: '#E8EBF2',
-        borderRadius: 12,
-    },
-    viewAll: { color: '#1e3c72', fontWeight: '700', fontSize: 12 },
-    scrollContainer: { paddingLeft: 10, paddingRight: 20 },
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: '#1a1a1a' },
+    subTitle: { fontSize: 11, color: '#8E8E93', marginTop: 1 },
+    viewAllBtn: { paddingVertical: 4 },
+    viewAll: { color: COLORS.primary, fontWeight: '700', fontSize: 12 },
+    scrollContainer: { paddingHorizontal: 20 },
     cardWrapper: {
         width: CARD_WIDTH,
         marginRight: SPACING,
-        elevation: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
+        ...Platform.select({
+            ios: {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+            },
+            android: { elevation: 4 },
+        }),
     },
     card: {
-        height: 130,
-        borderRadius: 20,
+        height: 100,
+        borderRadius: 12,
         flexDirection: 'row',
         overflow: 'hidden',
     },
     leftPortion: {
-        width: '32%',
+        width: '28%',
         justifyContent: 'center',
         alignItems: 'center',
-        borderRightWidth: 0,
+        backgroundColor: 'rgba(0,0,0,0.05)',
     },
     discountValue: {
         color: '#fff',
-        fontSize: 28,
-        fontWeight: '900',
-        letterSpacing: -1,
+        fontSize: 22,
+        fontWeight: '800',
+        letterSpacing: -0.5,
     },
     offLabel: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 10,
-        fontWeight: 'bold',
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 8,
+        fontWeight: '900',
+        marginTop: -2,
     },
     dividerContainer: {
-        width: 2,
+        width: 1,
         height: '100%',
         alignItems: 'center',
         justifyContent: 'center',
@@ -220,45 +224,59 @@ const styles = StyleSheet.create({
     dashedLine: {
         flex: 1,
         width: 1,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
+        borderWidth: 0.5,
+        borderColor: 'rgba(255,255,255,0.3)',
         borderStyle: 'dashed',
-        marginVertical: 12,
+        marginVertical: 10,
     },
     circleNotchTop: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: '#F8F9FA',
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#F8F9FB', // Matches background
         position: 'absolute',
-        top: -12,
+        top: -8,
+        left: -8,
     },
     circleNotchBottom: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
-        backgroundColor: '#F8F9FA',
+        width: 16,
+        height: 16,
+        borderRadius: 8,
+        backgroundColor: '#F8F9FB', // Matches background
         position: 'absolute',
-        bottom: -12,
+        bottom: -8,
+        left: -8,
     },
-    rightPortion: { flex: 1, padding: 16, justifyContent: 'space-between' },
-    couponTitle: { color: '#fff', fontSize: 17, fontWeight: 'bold' },
-    minSpend: { color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 4 },
+    rightPortion: { flex: 1, padding: 12, justifyContent: 'space-between' },
+    couponTitle: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    minSpend: { color: 'rgba(255,255,255,0.7)', fontSize: 10, marginTop: 2 },
     footer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
     },
-    expiryBox: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    expiryText: { color: '#FFD700', fontSize: 11, fontWeight: '600' },
-    shopBtn: {
-        backgroundColor: '#fff',
-        paddingVertical: 6,
-        paddingHorizontal: 14,
-        borderRadius: 25,
+    expiryBox: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+        borderRadius: 4,
     },
-    shopBtnText: { color: '#1e3c72', fontSize: 11, fontWeight: '900' },
-    loader: { height: 140, justifyContent: 'center', alignItems: 'center' },
+    expiryText: {
+        color: '#FFF',
+        fontSize: 9,
+        fontWeight: '700',
+        marginLeft: 3,
+    },
+    applyBtn: {
+        backgroundColor: '#fff',
+        paddingVertical: 5,
+        paddingHorizontal: 12,
+        borderRadius: 6,
+    },
+    applyBtnText: { color: '#1A2980', fontSize: 10, fontWeight: '800' },
+    loader: { height: 100, justifyContent: 'center', alignItems: 'center' },
 })
 
-export default CouponCarousel
+export default memo(CouponCarousel)

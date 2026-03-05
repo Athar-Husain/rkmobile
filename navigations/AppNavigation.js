@@ -1,4 +1,3 @@
-// AppNavigation.js
 import React, { useEffect } from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import { useSelector, useDispatch } from 'react-redux'
@@ -8,6 +7,7 @@ import MainStack from './MainStack'
 import OnboardingStack from './OnboardingStack'
 import StaffStack from './StaffStack'
 import { COLORS } from '../constants'
+import { useTheme } from '../theme/ThemeProvider'
 import {
     initializeApplication,
     setAppReady,
@@ -15,6 +15,7 @@ import {
 
 const AppNavigation = () => {
     const dispatch = useDispatch()
+    const { colors } = useTheme()
     const {
         isLoggedIn,
         user,
@@ -22,6 +23,7 @@ const AppNavigation = () => {
         isInitializing,
         hasCompletedOnboarding,
     } = useSelector((state) => state.auth)
+
     const userType = user?.userType
 
     useEffect(() => {
@@ -39,9 +41,16 @@ const AppNavigation = () => {
 
     if (!isAppReady || isInitializing) {
         return (
-            <View style={styles.loaderContainer}>
+            <View
+                style={[
+                    styles.loaderContainer,
+                    { backgroundColor: colors.background },
+                ]}
+            >
                 <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={styles.loadingText}>Loading...</Text>
+                <Text style={[styles.loadingText, { color: colors.text }]}>
+                    Initializing...
+                </Text>
             </View>
         )
     }
@@ -66,9 +75,8 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#fff',
     },
-    loadingText: { marginTop: 12, fontSize: 16, color: COLORS.primary },
+    loadingText: { marginTop: 12, fontSize: 16 },
 })
 
 export default AppNavigation

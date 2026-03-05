@@ -19,14 +19,8 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import moment from 'moment'
 import { addRating } from '../../redux/features/Purchases/PurchaseSlice.js'
 
-// Import your Redux actions
-// import { getMyPurchases, addRating } from '../../../redux/features/Purchase/PurchaseSlice';
+const { height } = Dimensions.get('window')
 
-const { height, width } = Dimensions.get('window')
-
-/* =============================================================================
-   SUB-COMPONENT: OrderDetailsModal
-   ============================================================================= */
 const OrderDetailsModal = ({ visible, order, onClose }) => {
     const dispatch = useDispatch()
     const [userRating, setUserRating] = useState(0)
@@ -74,12 +68,11 @@ const OrderDetailsModal = ({ visible, order, onClose }) => {
                 style={styles.modalOverlay}
             >
                 <View style={styles.modalContent}>
-                    {/* Handle bar for visual cue */}
                     <View style={styles.modalHandle} />
 
                     <View style={styles.modalHeader}>
                         <Text style={styles.modalHeaderTitle}>
-                            Invoice Details
+                            Order Details
                         </Text>
                         <TouchableOpacity
                             onPress={onClose}
@@ -103,7 +96,9 @@ const OrderDetailsModal = ({ visible, order, onClose }) => {
                                 {order.invoiceNumber}
                             </Text>
                             <Text style={styles.summaryDate}>
-                                {moment(order.createdAt).format('LLLL')}
+                                {moment(order.createdAt).format(
+                                    'DD MMM YYYY, hh:mm A'
+                                )}
                             </Text>
                             <View style={styles.statusRow}>
                                 <Text style={styles.statusLabel}>
@@ -116,7 +111,7 @@ const OrderDetailsModal = ({ visible, order, onClose }) => {
                                             color:
                                                 order.status === 'COMPLETED'
                                                     ? '#2E7D32'
-                                                    : '#C62828',
+                                                    : '#EF6C00',
                                         },
                                     ]}
                                 >
@@ -127,14 +122,17 @@ const OrderDetailsModal = ({ visible, order, onClose }) => {
 
                         {/* 2. Items List */}
                         <Section title="Items Purchased" icon="basket-outline">
-                            {order.items.map((item, index) => (
+                            {order.items?.map((item, index) => (
                                 <View key={index} style={styles.itemRow}>
                                     <View style={{ flex: 1 }}>
                                         <Text style={styles.itemNameText}>
                                             {item.name}
                                         </Text>
                                         <Text style={styles.itemSubText}>
-                                            {item.brand} • {item.model}
+                                            {item.brand}{' '}
+                                            {item.model
+                                                ? `• ${item.model}`
+                                                : ''}
                                         </Text>
                                     </View>
                                     <Text style={styles.itemQty}>
@@ -142,9 +140,10 @@ const OrderDetailsModal = ({ visible, order, onClose }) => {
                                     </Text>
                                     <Text style={styles.itemPrice}>
                                         ₹
-                                        {item.totalPrice?.toLocaleString(
-                                            'en-IN'
-                                        )}
+                                        {(
+                                            item.totalPrice ||
+                                            item.price * item.quantity
+                                        )?.toLocaleString('en-IN')}
                                     </Text>
                                 </View>
                             ))}
@@ -189,32 +188,39 @@ const OrderDetailsModal = ({ visible, order, onClose }) => {
                                     ₹{order.subtotal?.toLocaleString('en-IN')}
                                 </Text>
                             </View>
-                            <View style={styles.billRow}>
-                                <Text style={styles.billLabel}>
-                                    Tax & Charges
-                                </Text>
-                                <Text style={styles.billValue}>
-                                    +₹{order.tax?.toLocaleString('en-IN')}
-                                </Text>
-                            </View>
-                            <View style={styles.billRow}>
-                                <Text
-                                    style={[
-                                        styles.billLabel,
-                                        { color: '#2E7D32' },
-                                    ]}
-                                >
-                                    Discount Applied
-                                </Text>
-                                <Text
-                                    style={[
-                                        styles.billValue,
-                                        { color: '#2E7D32' },
-                                    ]}
-                                >
-                                    -₹{order.discount?.toLocaleString('en-IN')}
-                                </Text>
-                            </View>
+                            {order.tax > 0 && (
+                                <View style={styles.billRow}>
+                                    <Text style={styles.billLabel}>
+                                        Tax & Charges
+                                    </Text>
+                                    <Text style={styles.billValue}>
+                                        +₹{order.tax?.toLocaleString('en-IN')}
+                                    </Text>
+                                </View>
+                            )}
+                            {order.discount > 0 && (
+                                <View style={styles.billRow}>
+                                    <Text
+                                        style={[
+                                            styles.billLabel,
+                                            { color: '#2E7D32' },
+                                        ]}
+                                    >
+                                        Discount Applied
+                                    </Text>
+                                    <Text
+                                        style={[
+                                            styles.billValue,
+                                            { color: '#2E7D32' },
+                                        ]}
+                                    >
+                                        -₹
+                                        {order.discount?.toLocaleString(
+                                            'en-IN'
+                                        )}
+                                    </Text>
+                                </View>
+                            )}
                             <View style={[styles.billRow, styles.totalRow]}>
                                 <Text style={styles.totalLabel}>
                                     Grand Total
@@ -230,7 +236,7 @@ const OrderDetailsModal = ({ visible, order, onClose }) => {
                             </Text>
                         </Section>
 
-                        {/* 5. Rating & Feedback System */}
+                        {/* 5. Rating & Feedback */}
                         <Section title="Rate your Purchase" icon="star-outline">
                             <View style={styles.ratingContainer}>
                                 <View style={styles.starsRow}>
@@ -279,7 +285,9 @@ const OrderDetailsModal = ({ visible, order, onClose }) => {
                                         <ActivityIndicator color="#FFF" />
                                     ) : (
                                         <Text style={styles.submitRatingText}>
-                                            Update Review
+                                            {order.rating
+                                                ? 'Update Review'
+                                                : 'Submit Review'}
                                         </Text>
                                     )}
                                 </TouchableOpacity>
@@ -293,7 +301,6 @@ const OrderDetailsModal = ({ visible, order, onClose }) => {
 }
 
 const styles = StyleSheet.create({
-    // Modal Styles
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(15, 23, 42, 0.6)',
@@ -320,7 +327,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 15,
     },
-    modalHeaderTitle: { fontSize: 22, fontWeight: '800', color: '#0F172A' },
+    modalHeaderTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
     closeBtn: { padding: 4 },
     modalScroll: { paddingBottom: 40 },
     summaryCard: {
@@ -331,7 +338,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#F1F5F9',
     },
-    summaryInvoice: { fontSize: 20, fontWeight: '800', color: '#004AAD' },
+    summaryInvoice: { fontSize: 18, fontWeight: '800', color: '#004AAD' },
     summaryDate: { fontSize: 13, color: '#64748B', marginTop: 4 },
     statusRow: { flexDirection: 'row', marginTop: 10, alignItems: 'center' },
     statusLabel: { fontSize: 13, color: '#64748B' },
@@ -345,11 +352,11 @@ const styles = StyleSheet.create({
     },
     sectionTitle: { fontSize: 16, fontWeight: '700', color: '#334155' },
     itemRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-    itemNameText: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
+    itemNameText: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
     itemSubText: { fontSize: 12, color: '#94A3B8' },
     itemQty: { fontSize: 14, color: '#64748B', marginHorizontal: 15 },
     itemPrice: {
-        fontSize: 15,
+        fontSize: 14,
         fontWeight: '700',
         color: '#0F172A',
         width: 90,
@@ -397,7 +404,7 @@ const styles = StyleSheet.create({
         padding: 12,
         height: 80,
         textAlignVertical: 'top',
-        borderHorizontal: 1,
+        borderWidth: 1,
         borderColor: '#E2E8F0',
     },
     submitRatingBtn: {
@@ -410,4 +417,5 @@ const styles = StyleSheet.create({
     },
     submitRatingText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
 })
+
 export default OrderDetailsModal

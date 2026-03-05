@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import {
     View,
     Text,
@@ -8,455 +8,402 @@ import {
     ActivityIndicator,
     Modal,
     Pressable,
-    Dimensions,
     SafeAreaView,
+    Dimensions,
+    Platform,
 } from 'react-native'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
-import * as Clipboard from 'expo-clipboard'
-import { fetchMyCoupons } from '../redux/features/Coupons/CouponSlice'
+import QRCode from 'react-native-qrcode-svg'
 import { useDispatch, useSelector } from 'react-redux'
-import { useFocusEffect } from '@react-navigation/native'
-import CouponList from '../containers/Coupons/CouponList'
+import { useFocusEffect, useRoute } from '@react-navigation/native'
+import {
+    fetchDiscoverCoupons,
+    fetchActiveCoupons,
+    fetchHistoryCoupons,
+    fetchUserSavings,
+    claimCouponUser,
+} from '../redux/features/Coupons/CouponSlice'
 
 const { width } = Dimensions.get('window')
 
 const CouponsScreen = () => {
     const dispatch = useDispatch()
-    const [loading, setLoading] = useState(true)
-    const [coupons, setCoupons] = useState([])
-    const [activeTab, setActiveTab] = useState('active') // 'active' or 'history'
+    const route = useRoute()
+
+    // Updated Tab Names for better understanding
+    // 'discover' -> 'get_new'
+    // 'active'   -> 'my_rewards'
+    // 'history'  -> 'used'
+    const [activeTab, setActiveTab] = useState('get_new')
     const [modalVisible, setModalVisible] = useState(false)
     const [selectedCoupon, setSelectedCoupon] = useState(null)
-    const [copiedId, setCopiedId] = useState(null)
 
-    const { myCoupons, isCouponLoading } = useSelector((state) => state.coupon)
-
-    console.log('myCoupons', myCoupons)
-
-    // useEffect(() => {
-    //     dispatch(fetchMyCoupons())
-    // }, [dispatch])
-
-    useFocusEffect(
-        React.useCallback(() => {
-            dispatch(fetchMyCoupons())
-        }, [dispatch])
-    )
+    const {
+        discoverCoupons,
+        activeCoupons,
+        historyCoupons,
+        userSavings,
+        isCouponLoading,
+    } = useSelector((state) => state.coupon)
 
     useEffect(() => {
-        // Simulating API Fetch
-        setTimeout(() => {
-            setCoupons([
-                {
-                    id: '1',
-                    code: 'RKESTAR20',
-                    discount: '20% OFF',
-                    desc: 'On all AC installations',
-                    status: 'active',
-                    savingsValue: 1200,
-                    color: '#004AAD',
-                },
-                {
-                    id: '2',
-                    code: 'SAVE500',
-                    discount: '₹500 OFF',
-                    desc: 'Min. purchase of ₹10,000',
-                    status: 'active',
-                    savingsValue: 500,
-                    color: '#E91E63',
-                },
-                {
-                    id: '3',
-                    code: 'WELCOME75',
-                    discount: '₹75 OFF',
-                    desc: 'First purchase special',
-                    status: 'redeemed',
-                    savingsValue: 75,
-                    color: '#4CAF50',
-                },
-                {
-                    id: '4',
-                    code: 'WINTER25',
-                    discount: '25% OFF',
-                    desc: 'Geyser Service Special',
-                    status: 'expired',
-                    savingsValue: 450,
-                    color: '#FF9800',
-                },
-            ])
-            setLoading(false)
-        }, 800)
-    }, [])
+        if (route.params?.initialTab) {
+            // Map incoming navigation params to new tab names
+            const tabMap = {
+                discover: 'get_new',
+                active: 'my_rewards',
+                history: 'used',
+            }
+            setActiveTab(tabMap[route.params.initialTab] || 'get_new')
+        }
+    }, [route.params?.initialTab])
 
-    const filteredCoupons = coupons.filter((c) =>
-        activeTab === 'active' ? c.status === 'active' : c.status !== 'active'
+    const fetchCoupons = useCallback(async () => {
+        dispatch(fetchUserSavings())
+        if (activeTab === 'get_new') {
+            await dispatch(fetchDiscoverCoupons())
+        } else if (activeTab === 'my_rewards') {
+            await dispatch(fetchActiveCoupons())
+        } else if (activeTab === 'used') {
+            await dispatch(fetchHistoryCoupons())
+        }
+    }, [activeTab, dispatch])
+
+    useFocusEffect(
+        useCallback(() => {
+            fetchCoupons()
+        }, [fetchCoupons])
     )
 
-    const totalSaved = coupons
-        .filter((c) => c.status === 'redeemed')
-        .reduce((sum, item) => sum + item.savingsValue, 0)
-
-    const copyToClipboard = async (code, id) => {
-        await Clipboard.setStringAsync(code)
-        setCopiedId(id)
-        setTimeout(() => setCopiedId(null), 2000)
+    const handleClaim = (id) => {
+        dispatch(claimCouponUser(id)).then((res) => {
+            if (res.meta.requestStatus === 'fulfilled') {
+                setActiveTab('my_rewards')
+            }
+        })
     }
 
-    const renderCoupon = ({ item }) => {
-        const isHistory = item.status !== 'active'
+    const renderHeader = () => (
+        <View style={styles.savingsCard}>
+            <View>
+                <Text style={styles.savingsLabel}>Total Savings</Text>
+                <Text style={styles.savingsValue}>
+                    ₹{userSavings?.totalAmount || 0}
+                </Text>
+            </View>
+            <View style={styles.savingsStat}>
+                <Text style={styles.savingsLabel}>Used</Text>
+                <Text style={styles.savingsValue}>
+                    {userSavings?.count || 0}
+                </Text>
+            </View>
+            <MaterialCommunityIcons
+                name="wallet-giftcard"
+                size={40}
+                color="rgba(255,255,255,0.3)"
+            />
+        </View>
+    )
 
-        return (
-            <View
-                style={[
-                    styles.couponWrapper,
-                    isHistory && styles.historyOpacity,
-                ]}
-            >
+    const renderCoupon = useCallback(
+        ({ item }) => {
+            const isGetNew = activeTab === 'get_new'
+            const isUsed = activeTab === 'used'
+            const isMyRewards = activeTab === 'my_rewards'
+
+            const couponData =
+                item.couponId && typeof item.couponId === 'object'
+                    ? item.couponId
+                    : item
+
+            const now = new Date()
+            const expiryDate = new Date(couponData.validUntil)
+            const daysLeft = Math.max(
+                Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24)),
+                0
+            )
+
+            const themeColor =
+                daysLeft <= 2 && expiryDate > now
+                    ? '#E74C3C'
+                    : couponData.color || '#004AAD'
+
+            return (
                 <TouchableOpacity
-                    activeOpacity={isHistory ? 1 : 0.8}
-                    onPress={() =>
-                        !isHistory &&
-                        (setSelectedCoupon(item), setModalVisible(true))
-                    }
-                    style={styles.couponCard}
+                    activeOpacity={isGetNew ? 1 : 0.8}
+                    onPress={() => {
+                        if (isMyRewards) {
+                            setSelectedCoupon(item)
+                            setModalVisible(true)
+                        }
+                    }}
+                    style={[styles.couponCard, isUsed && { opacity: 0.7 }]}
                 >
                     <View
                         style={[
                             styles.leftTab,
                             {
-                                backgroundColor: isHistory
+                                backgroundColor: isUsed
                                     ? '#BDC3C7'
-                                    : item.color,
+                                    : themeColor,
                             },
                         ]}
                     >
-                        <Text style={styles.discountText}>{item.discount}</Text>
-                        <MaterialCommunityIcons
-                            name={
-                                item.status === 'redeemed'
-                                    ? 'check-circle'
-                                    : item.status === 'expired'
-                                      ? 'close-circle'
-                                      : 'ticket-percent'
-                            }
-                            size={20}
-                            color="white"
-                        />
+                        <Text style={styles.discountText}>
+                            {couponData.type === 'PERCENTAGE'
+                                ? `${couponData.value}%`
+                                : `₹${couponData.value}`}
+                            {'\n'}OFF
+                        </Text>
+                        <View style={styles.cutoutTop} />
+                        <View style={styles.cutoutBottom} />
                     </View>
 
                     <View style={styles.rightContent}>
-                        <View style={styles.cardHeader}>
-                            <Text style={styles.couponDesc} numberOfLines={2}>
-                                {item.desc}
-                            </Text>
-                            {isHistory && (
-                                <View
-                                    style={[
-                                        styles.statusBadge,
-                                        {
-                                            backgroundColor:
-                                                item.status === 'expired'
-                                                    ? '#FDEDEC'
-                                                    : '#EAFAF1',
-                                        },
-                                    ]}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.statusText,
-                                            {
-                                                color:
-                                                    item.status === 'expired'
-                                                        ? '#E74C3C'
-                                                        : '#27AE60',
-                                            },
-                                        ]}
-                                    >
-                                        {item.status.toUpperCase()}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
+                        <Text style={styles.couponTitle} numberOfLines={1}>
+                            {couponData.title}
+                        </Text>
+                        <Text style={styles.couponSub} numberOfLines={2}>
+                            {couponData.description}
+                        </Text>
 
-                        <TouchableOpacity
-                            disabled={isHistory}
-                            onPress={() => copyToClipboard(item.code, item.id)}
-                            style={[
-                                styles.codeContainer,
-                                copiedId === item.id && styles.copiedContainer,
-                            ]}
-                        >
+                        {!isUsed ? (
                             <Text
                                 style={[
-                                    styles.codeText,
-                                    isHistory && { color: '#999' },
+                                    styles.couponExpiry,
+                                    daysLeft <= 2 && { color: '#E74C3C' },
                                 ]}
                             >
-                                {copiedId === item.id ? 'COPIED!' : item.code}
+                                {expiryDate > now
+                                    ? `Ends in ${daysLeft} days`
+                                    : 'Expired'}
                             </Text>
-                            {!isHistory && (
+                        ) : (
+                            <Text
+                                style={[
+                                    styles.statusText,
+                                    {
+                                        color:
+                                            item.status === 'USED'
+                                                ? '#27AE60'
+                                                : '#E74C3C',
+                                    },
+                                ]}
+                            >
+                                {item.status === 'USED' ? 'Used' : 'Expired'}
+                            </Text>
+                        )}
+
+                        {isGetNew ? (
+                            <TouchableOpacity
+                                style={[
+                                    styles.claimBtn,
+                                    { backgroundColor: themeColor },
+                                ]}
+                                onPress={() => handleClaim(couponData._id)}
+                            >
+                                <Text style={styles.claimBtnText}>
+                                    GET THIS
+                                </Text>
+                            </TouchableOpacity>
+                        ) : isMyRewards ? (
+                            <View style={styles.statusRow}>
                                 <MaterialCommunityIcons
-                                    name="content-copy"
-                                    size={14}
-                                    color="#004AAD"
+                                    name="qrcode-scan"
+                                    size={16}
+                                    color={themeColor}
                                 />
-                            )}
-                        </TouchableOpacity>
+                                <Text
+                                    style={[
+                                        styles.statusText,
+                                        { color: themeColor },
+                                    ]}
+                                >
+                                    Tap to Show QR
+                                </Text>
+                            </View>
+                        ) : null}
                     </View>
-
-                    <View style={styles.cutoutTop} />
-                    <View style={styles.cutoutBottom} />
                 </TouchableOpacity>
-            </View>
-        )
-    }
+            )
+        },
+        [activeTab]
+    )
 
-    if (loading)
-        return (
-            <ActivityIndicator
-                size="large"
-                color="#004AAD"
-                style={{ flex: 1 }}
-            />
-        )
+    const tabs = [
+        { id: 'get_new', label: 'GET NEW' },
+        { id: 'my_rewards', label: 'MY REWARDS' },
+        { id: 'used', label: 'USED' },
+    ]
 
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.container}>
-                {/* 1. Enhanced Dashboard Section */}
-                <View style={styles.header}>
-                    <Text style={styles.headerTitle}>Rewards Center</Text>
-                    <View style={styles.dashboardCard}>
-                        <View>
-                            <Text style={styles.dashLabel}>
-                                Lifetime Savings
-                            </Text>
-                            <Text style={styles.dashAmount}>₹{totalSaved}</Text>
-                        </View>
-                        <View style={styles.progressContainer}>
-                            <Text style={styles.progressText}>
-                                ₹300 to next Reward
-                            </Text>
-                            <View style={styles.progressBarBg}>
-                                <View
-                                    style={[
-                                        styles.progressBarFill,
-                                        { width: '70%' },
-                                    ]}
-                                />
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
-                {/* 2. Custom Tab Switcher */}
-                <View style={styles.tabContainer}>
-                    {['active', 'history'].map((tab) => (
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>RK Rewards</Text>
+                {renderHeader()}
+                <View style={styles.tabBar}>
+                    {tabs.map((tab) => (
                         <TouchableOpacity
-                            key={tab}
+                            key={tab.id}
+                            onPress={() => setActiveTab(tab.id)}
                             style={[
-                                styles.tab,
-                                activeTab === tab && styles.activeTab,
+                                styles.tabItem,
+                                activeTab === tab.id && styles.activeTabItem,
                             ]}
-                            onPress={() => setActiveTab(tab)}
                         >
                             <Text
                                 style={[
-                                    styles.tabText,
-                                    activeTab === tab && styles.activeTabText,
+                                    styles.tabLabel,
+                                    activeTab === tab.id &&
+                                        styles.activeTabLabel,
                                 ]}
                             >
-                                {tab === 'active'
-                                    ? 'Available'
-                                    : 'Past Vouchers'}
+                                {tab.label}
                             </Text>
                         </TouchableOpacity>
                     ))}
                 </View>
+            </View>
 
+            {isCouponLoading &&
+            !discoverCoupons.length &&
+            !activeCoupons.length ? (
+                <View style={styles.center}>
+                    <ActivityIndicator size="large" color="#004AAD" />
+                </View>
+            ) : (
                 <FlatList
-                    data={filteredCoupons}
+                    data={
+                        activeTab === 'get_new'
+                            ? discoverCoupons
+                            : activeTab === 'my_rewards'
+                              ? activeCoupons
+                              : historyCoupons
+                    }
                     renderItem={renderCoupon}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={{
-                        paddingHorizontal: 20,
-                        paddingBottom: 30,
-                    }}
+                    keyExtractor={(item, index) => item._id || index.toString()}
+                    contentContainerStyle={[
+                        styles.listContainer,
+                        { paddingBottom: 140 },
+                    ]} // Extra padding for bottom nav
+                    showsVerticalScrollIndicator={false}
                     ListEmptyComponent={
                         <View style={styles.emptyState}>
                             <MaterialCommunityIcons
-                                name="ticket-outline"
+                                name="ticket-percent-outline"
                                 size={80}
-                                color="#DCDDE1"
+                                color="#ccc"
                             />
-                            <Text style={styles.emptyTitle}>
-                                No Vouchers Yet
-                            </Text>
-                            <Text style={styles.emptySub}>
-                                Keep shopping to unlock exclusive deals!
-                            </Text>
+                            <Text style={styles.emptyText}>Nothing here</Text>
                         </View>
                     }
+                    refreshing={isCouponLoading}
+                    onRefresh={fetchCoupons}
                 />
+            )}
 
-                {/* Modal remains largely the same but with style tweaks for "Premium" feel */}
-                {/* ... Modal Code ... */}
-
-                <CouponList />
-
-                {/* REDEEM MODAL */}
-                <Modal
-                    animationType="slide"
-                    transparent
-                    visible={modalVisible}
-                    onRequestClose={() => setModalVisible(false)}
+            <Modal visible={modalVisible} transparent animationType="fade">
+                <Pressable
+                    style={styles.modalOverlay}
+                    onPress={() => setModalVisible(false)}
                 >
-                    <Pressable
-                        style={styles.modalOverlay}
-                        onPress={() => setModalVisible(false)}
-                    >
-                        <View style={styles.modalContent}>
-                            <View
-                                style={[
-                                    styles.modalHeader,
-                                    { backgroundColor: selectedCoupon?.color },
-                                ]}
-                            >
-                                <Text style={styles.modalHeaderText}>
-                                    Show at Checkout
-                                </Text>
-                            </View>
-                            <View style={styles.modalBody}>
-                                <Text style={styles.modalDesc}>
-                                    {selectedCoupon?.desc}
-                                </Text>
-                                <View style={styles.qrFrame}>
-                                    <MaterialCommunityIcons
-                                        name="qrcode"
-                                        size={180}
-                                        color="#1A1A1A"
-                                    />
-                                </View>
-                                <Text style={styles.modalCodeDisplay}>
-                                    {selectedCoupon?.code}
-                                </Text>
-                                <Text style={styles.modalHint}>
-                                    Scan this code at any RK Electronics outlet
-                                    in Ballari to apply your discount.
-                                </Text>
-                                <TouchableOpacity
-                                    style={styles.doneButton}
-                                    onPress={() => setModalVisible(false)}
-                                >
-                                    <Text style={styles.doneButtonText}>
-                                        Close
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Redeem Offer</Text>
+                        <Text style={styles.modalSubtitle}>
+                            Show this QR at the counter
+                        </Text>
+                        <View style={styles.qrWrapper}>
+                            {selectedCoupon?.uniqueCode && (
+                                <QRCode
+                                    value={selectedCoupon.uniqueCode}
+                                    size={width * 0.55}
+                                />
+                            )}
                         </View>
-                    </Pressable>
-                </Modal>
-            </View>
+                        <Text style={styles.uniqueCodeText}>
+                            {selectedCoupon?.uniqueCode}
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.closeButton}
+                            onPress={() => setModalVisible(false)}
+                        >
+                            <Text style={styles.closeButtonText}>GO BACK</Text>
+                        </TouchableOpacity>
+                    </View>
+                </Pressable>
+            </Modal>
         </SafeAreaView>
     )
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F9FB' },
-    header: { paddingTop: 60, paddingHorizontal: 20, paddingBottom: 20 },
-    headerTitle: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: '#1A1A1A',
-        marginBottom: 20,
+    header: {
+        backgroundColor: '#FFF',
+        padding: 20,
+        paddingTop: Platform.OS === 'android' ? 45 : 20,
+        borderBottomLeftRadius: 30,
+        borderBottomRightRadius: 30,
+        elevation: 8,
+        zIndex: 10,
     },
-
-    // Dashboard
-    dashboardCard: {
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: '900',
+        color: '#004AAD',
+        marginBottom: 15,
+    },
+    tabBar: {
+        flexDirection: 'row',
+        backgroundColor: '#F1F3F5',
+        borderRadius: 15,
+        padding: 5,
+    },
+    tabItem: {
+        flex: 1,
+        paddingVertical: 12,
+        alignItems: 'center',
+        borderRadius: 12,
+    },
+    activeTabItem: { backgroundColor: '#FFF', elevation: 3 },
+    tabLabel: { fontSize: 12, fontWeight: '800', color: '#95A5A6' },
+    activeTabLabel: { color: '#004AAD' },
+    listContainer: { padding: 20 },
+    savingsCard: {
         backgroundColor: '#004AAD',
         borderRadius: 20,
         padding: 20,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-    },
-    dashLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
-    dashAmount: { color: '#FFF', fontSize: 32, fontWeight: 'bold' },
-    progressContainer: { alignItems: 'flex-end', width: '40%' },
-    progressText: { color: '#FFF', fontSize: 10, marginBottom: 5 },
-    progressBarBg: {
-        width: '100%',
-        height: 6,
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        borderRadius: 3,
-    },
-    progressBarFill: { height: 6, backgroundColor: '#FFF', borderRadius: 3 },
-
-    // Tabs
-    tabContainer: {
-        flexDirection: 'row',
-        marginHorizontal: 20,
         marginBottom: 20,
-        backgroundColor: '#EEE',
-        borderRadius: 12,
-        padding: 4,
     },
-    tab: {
-        flex: 1,
-        paddingVertical: 10,
-        alignItems: 'center',
-        borderRadius: 10,
+    savingsLabel: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 11,
+        fontWeight: '600',
     },
-    activeTab: { backgroundColor: '#FFF', elevation: 2 },
-    tabText: { fontSize: 14, color: '#7F8C8D', fontWeight: '600' },
-    activeTabText: { color: '#004AAD' },
-
-    // Coupon Card
-    couponWrapper: { marginBottom: 15 },
-    historyOpacity: { opacity: 0.8 },
+    savingsValue: { color: '#FFF', fontSize: 22, fontWeight: '900' },
     couponCard: {
         backgroundColor: '#FFF',
         borderRadius: 16,
-        height: 110,
         flexDirection: 'row',
-        overflow: 'hidden',
+        marginBottom: 16,
+        height: 130,
         elevation: 3,
+        overflow: 'hidden',
     },
-    leftTab: { width: '28%', justifyContent: 'center', alignItems: 'center' },
+    leftTab: { width: '30%', justifyContent: 'center', alignItems: 'center' },
     discountText: {
         color: '#FFF',
-        fontWeight: 'bold',
+        fontWeight: '900',
         fontSize: 18,
         textAlign: 'center',
     },
-    rightContent: { flex: 1, padding: 15, justifyContent: 'space-between' },
-    cardHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-    couponDesc: { fontSize: 14, fontWeight: '700', color: '#2C3E50', flex: 1 },
-    codeContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        alignSelf: 'flex-start',
-        padding: 8,
-        borderRadius: 8,
-        backgroundColor: '#F0F5FF',
-        borderStyle: 'dashed',
-        borderWidth: 1,
-        borderColor: '#004AAD',
-    },
-    copiedContainer: { backgroundColor: '#EAFAF1', borderColor: '#27AE60' },
-    codeText: {
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#004AAD',
-        marginRight: 10,
-    },
-
-    // Visuals
     cutoutTop: {
         position: 'absolute',
         top: -10,
-        left: '28%',
-        marginLeft: -10,
+        right: -10,
         width: 20,
         height: 20,
         borderRadius: 10,
@@ -465,76 +412,68 @@ const styles = StyleSheet.create({
     cutoutBottom: {
         position: 'absolute',
         bottom: -10,
-        left: '28%',
-        marginLeft: -10,
+        right: -10,
         width: 20,
         height: 20,
         borderRadius: 10,
         backgroundColor: '#F8F9FB',
     },
-    statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-    statusText: { fontSize: 10, fontWeight: 'bold' },
-
-    emptyState: { alignItems: 'center', marginTop: 60 },
-    emptyTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#7F8C8D',
-        marginTop: 15,
+    rightContent: { flex: 1, padding: 15, justifyContent: 'center' },
+    couponTitle: { fontSize: 16, fontWeight: '800', color: '#2C3E50' },
+    couponSub: { fontSize: 12, color: '#7F8C8D', marginVertical: 3 },
+    couponExpiry: { fontSize: 11, fontWeight: '700', color: '#E67E22' },
+    claimBtn: {
+        paddingVertical: 8,
+        paddingHorizontal: 15,
+        borderRadius: 8,
+        alignSelf: 'flex-start',
+        marginTop: 8,
     },
-    emptySub: { color: '#95A5A6', marginTop: 5 },
-
-    // Modal
+    claimBtnText: { color: '#FFF', fontSize: 11, fontWeight: '900' },
+    statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 5 },
+    statusText: { fontSize: 12, fontWeight: '700', marginLeft: 6 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     modalOverlay: {
         flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.7)',
+        backgroundColor: 'rgba(0,0,0,0.85)',
         justifyContent: 'center',
         alignItems: 'center',
     },
     modalContent: {
         width: '85%',
-        backgroundColor: '#fff',
+        backgroundColor: '#FFF',
         borderRadius: 25,
-        overflow: 'hidden',
+        padding: 25,
+        alignItems: 'center',
     },
-    modalHeader: { padding: 20, alignItems: 'center' },
-    modalHeaderText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-    modalBody: { padding: 25, alignItems: 'center' },
-    modalDesc: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#444',
-        textAlign: 'center',
-        marginBottom: 20,
-    },
-    qrFrame: {
-        padding: 10,
-        borderWidth: 1,
+    modalTitle: { fontSize: 20, fontWeight: '900', color: '#2C3E50' },
+    modalSubtitle: { fontSize: 13, color: '#7F8C8D', marginBottom: 25 },
+    qrWrapper: {
+        padding: 15,
+        backgroundColor: '#FFF',
+        borderRadius: 20,
+        elevation: 10,
+        borderWeight: 1,
         borderColor: '#eee',
-        borderRadius: 15,
-        marginBottom: 20,
     },
-    modalCodeDisplay: {
-        fontSize: 24,
-        fontWeight: '900',
-        letterSpacing: 3,
-        color: '#1A1A1A',
-        marginBottom: 10,
+    uniqueCodeText: {
+        marginTop: 20,
+        fontSize: 20,
+        fontWeight: 'bold',
+        letterSpacing: 5,
+        color: '#004AAD',
     },
-    modalHint: {
-        fontSize: 12,
-        color: '#888',
-        textAlign: 'center',
-        marginBottom: 20,
-    },
-    doneButton: {
+    closeButton: {
+        marginTop: 30,
         backgroundColor: '#004AAD',
         width: '100%',
         padding: 15,
-        borderRadius: 12,
+        borderRadius: 15,
         alignItems: 'center',
     },
-    doneButtonText: { color: '#fff', fontWeight: 'bold' },
+    closeButtonText: { color: '#FFF', fontWeight: '900' },
+    emptyState: { alignItems: 'center', marginTop: 80 },
+    emptyText: { color: '#BDC3C7', marginTop: 10, fontWeight: '700' },
 })
 
 export default CouponsScreen

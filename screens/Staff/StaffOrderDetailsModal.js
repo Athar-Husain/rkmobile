@@ -11,11 +11,21 @@ import {
 } from 'react-native'
 import Feather from 'react-native-vector-icons/Feather'
 import moment from 'moment'
+import { useTheme } from '../../theme/ThemeProvider' // Added theme hook
+import { COLORS } from '../../constants'
 
 const { height } = Dimensions.get('window')
 
 const StaffOrderDetailsModal = ({ visible, order, onClose }) => {
+    const { colors, dark } = useTheme()
+
     if (!order) return null
+
+    // Dynamic styles for the specific sheet components
+    const sheetBg = dark ? '#1C1C1E' : '#FFFFFF'
+    const secondarySurface = dark ? '#2C2C2E' : '#F8FAFC'
+    const borderColor = dark ? '#38383A' : '#F1F5F9'
+    const mutedText = dark ? '#8E8E93' : '#64748B'
 
     return (
         <Modal
@@ -25,17 +35,27 @@ const StaffOrderDetailsModal = ({ visible, order, onClose }) => {
             statusBarTranslucent
         >
             <View style={styles.overlay}>
-                <View style={styles.content}>
-                    {/* Handlebar for visual "Sheet" look */}
-                    <View style={styles.handle} />
+                <View style={[styles.content, { backgroundColor: sheetBg }]}>
+                    {/* Handlebar */}
+                    <View
+                        style={[
+                            styles.handle,
+                            { backgroundColor: dark ? '#3A3A3C' : '#E2E8F0' },
+                        ]}
+                    />
 
                     <View style={styles.header}>
-                        <Text style={styles.title}>Transaction Details</Text>
+                        <Text style={[styles.title, { color: colors.text }]}>
+                            Transaction Details
+                        </Text>
                         <TouchableOpacity
                             onPress={onClose}
-                            style={styles.closeBtn}
+                            style={[
+                                styles.closeBtn,
+                                { backgroundColor: secondarySurface },
+                            ]}
                         >
-                            <Feather name="x" size={20} color="#64748B" />
+                            <Feather name="x" size={20} color={mutedText} />
                         </TouchableOpacity>
                     </View>
 
@@ -45,14 +65,28 @@ const StaffOrderDetailsModal = ({ visible, order, onClose }) => {
                     >
                         {/* Status & Amount Hero Section */}
                         <View style={styles.heroSection}>
-                            <View style={styles.iconCircle}>
+                            <View
+                                style={[
+                                    styles.iconCircle,
+                                    {
+                                        backgroundColor: dark
+                                            ? 'rgba(16, 185, 129, 0.1)'
+                                            : '#ECFDF5',
+                                    },
+                                ]}
+                            >
                                 <Feather
                                     name="check"
                                     size={30}
                                     color="#10B981"
                                 />
                             </View>
-                            <Text style={styles.heroAmount}>
+                            <Text
+                                style={[
+                                    styles.heroAmount,
+                                    { color: colors.text },
+                                ]}
+                            >
                                 ₹
                                 {order.finalAmount?.toLocaleString('en-IN', {
                                     minimumFractionDigits: 2,
@@ -64,20 +98,45 @@ const StaffOrderDetailsModal = ({ visible, order, onClose }) => {
                         </View>
 
                         {/* Metadata Section */}
-                        <View style={styles.infoGrid}>
+                        <View
+                            style={[
+                                styles.infoGrid,
+                                { borderColor: borderColor },
+                            ]}
+                        >
                             <View style={styles.infoItem}>
-                                <Text style={styles.infoLabel}>
+                                <Text
+                                    style={[
+                                        styles.infoLabel,
+                                        { color: mutedText },
+                                    ]}
+                                >
                                     INVOICE NO.
                                 </Text>
-                                <Text style={styles.infoValue}>
+                                <Text
+                                    style={[
+                                        styles.infoValue,
+                                        { color: colors.text },
+                                    ]}
+                                >
                                     {order.invoiceNumber}
                                 </Text>
                             </View>
                             <View style={styles.infoItem}>
-                                <Text style={styles.infoLabel}>
+                                <Text
+                                    style={[
+                                        styles.infoLabel,
+                                        { color: mutedText },
+                                    ]}
+                                >
                                     DATE & TIME
                                 </Text>
-                                <Text style={styles.infoValue}>
+                                <Text
+                                    style={[
+                                        styles.infoValue,
+                                        { color: colors.text },
+                                    ]}
+                                >
                                     {moment(order.createdAt).format(
                                         'DD MMM YYYY, hh:mm A'
                                     )}
@@ -85,49 +144,111 @@ const StaffOrderDetailsModal = ({ visible, order, onClose }) => {
                             </View>
                         </View>
 
-                        <View style={styles.divider} />
-
                         {/* Items Section */}
-                        <Text style={styles.sectionTitle}>Order Summary</Text>
+                        <Text
+                            style={[
+                                styles.sectionTitle,
+                                { color: colors.text },
+                            ]}
+                        >
+                            Order Summary
+                        </Text>
                         {order.items.map((item, index) => (
                             <View key={index} style={styles.itemRow}>
                                 <View style={styles.itemMain}>
-                                    <Text style={styles.itemName}>
+                                    <Text
+                                        style={[
+                                            styles.itemName,
+                                            { color: colors.text },
+                                        ]}
+                                    >
                                         {item.name}
                                     </Text>
-                                    <Text style={styles.itemQty}>
+                                    <Text
+                                        style={[
+                                            styles.itemQty,
+                                            { color: mutedText },
+                                        ]}
+                                    >
                                         Qty: {item.quantity}
                                     </Text>
                                 </View>
-                                <Text style={styles.itemPrice}>
+                                <Text
+                                    style={[
+                                        styles.itemPrice,
+                                        { color: colors.text },
+                                    ]}
+                                >
                                     ₹{item.totalPrice?.toLocaleString('en-IN')}
                                 </Text>
                             </View>
                         ))}
 
-                        <View style={styles.dashedDivider} />
+                        <View
+                            style={[
+                                styles.dashedDivider,
+                                { borderColor: dark ? '#48484A' : '#E2E8F0' },
+                            ]}
+                        />
 
                         {/* Payment Summary */}
-                        <View style={styles.paymentBox}>
+                        <View
+                            style={[
+                                styles.paymentBox,
+                                { backgroundColor: secondarySurface },
+                            ]}
+                        >
                             <View style={styles.row}>
-                                <Text style={styles.rowLabel}>Subtotal</Text>
-                                <Text style={styles.rowValue}>
+                                <Text
+                                    style={[
+                                        styles.rowLabel,
+                                        { color: mutedText },
+                                    ]}
+                                >
+                                    Subtotal
+                                </Text>
+                                <Text
+                                    style={[
+                                        styles.rowValue,
+                                        { color: colors.text },
+                                    ]}
+                                >
                                     ₹{order.subtotal?.toLocaleString('en-IN')}
                                 </Text>
                             </View>
                             <View style={styles.row}>
-                                <Text style={styles.rowLabel}>
+                                <Text
+                                    style={[
+                                        styles.rowLabel,
+                                        { color: mutedText },
+                                    ]}
+                                >
                                     Tax & Service
                                 </Text>
-                                <Text style={styles.rowValue}>
+                                <Text
+                                    style={[
+                                        styles.rowValue,
+                                        { color: colors.text },
+                                    ]}
+                                >
                                     ₹{order.tax?.toLocaleString('en-IN')}
                                 </Text>
                             </View>
                             <View style={[styles.row, { marginTop: 12 }]}>
-                                <Text style={styles.totalLabel}>
+                                <Text
+                                    style={[
+                                        styles.totalLabel,
+                                        { color: colors.text },
+                                    ]}
+                                >
                                     Total Amount
                                 </Text>
-                                <Text style={styles.totalValue}>
+                                <Text
+                                    style={[
+                                        styles.totalValue,
+                                        { color: dark ? '#58A6FF' : '#004AAD' },
+                                    ]}
+                                >
                                     ₹
                                     {order.finalAmount?.toLocaleString('en-IN')}
                                 </Text>
@@ -136,18 +257,43 @@ const StaffOrderDetailsModal = ({ visible, order, onClose }) => {
                     </ScrollView>
 
                     {/* Action Footer */}
-                    <SafeAreaView style={styles.footer}>
-                        <TouchableOpacity style={styles.secondaryBtn}>
+                    <SafeAreaView
+                        style={[styles.footer, { borderColor: borderColor }]}
+                    >
+                        <TouchableOpacity
+                            style={[
+                                styles.secondaryBtn,
+                                {
+                                    backgroundColor: dark
+                                        ? '#2C2C2E'
+                                        : '#F1F5F9',
+                                },
+                            ]}
+                        >
                             <Feather
                                 name="download"
                                 size={18}
-                                color="#0F172A"
+                                color={colors.text}
                             />
-                            <Text style={styles.secondaryBtnText}>
-                                Download PDF
+                            <Text
+                                style={[
+                                    styles.secondaryBtnText,
+                                    { color: colors.text },
+                                ]}
+                            >
+                                PDF
                             </Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.primaryBtn}>
+                        <TouchableOpacity
+                            style={[
+                                styles.primaryBtn,
+                                {
+                                    backgroundColor: dark
+                                        ? COLORS.primary
+                                        : '#0F172A',
+                                },
+                            ]}
+                        >
                             <Feather name="share-2" size={18} color="#FFF" />
                             <Text style={styles.primaryBtnText}>
                                 Share Receipt
@@ -165,11 +311,10 @@ export default StaffOrderDetailsModal
 const styles = StyleSheet.create({
     overlay: {
         flex: 1,
-        backgroundColor: 'rgba(15, 23, 42, 0.6)', // Sleek dark overlay
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
         justifyContent: 'flex-end',
     },
     content: {
-        backgroundColor: '#FFF',
         height: height * 0.88,
         borderTopLeftRadius: 32,
         borderTopRightRadius: 32,
@@ -178,7 +323,6 @@ const styles = StyleSheet.create({
     handle: {
         width: 40,
         height: 5,
-        backgroundColor: '#E2E8F0',
         borderRadius: 10,
         alignSelf: 'center',
         marginTop: 12,
@@ -189,15 +333,12 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 20,
     },
-    title: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
+    title: { fontSize: 18, fontWeight: '700' },
     closeBtn: {
         padding: 8,
-        backgroundColor: '#F8FAFC',
         borderRadius: 20,
     },
     scrollBody: { paddingBottom: 40 },
-
-    // Hero Section
     heroSection: {
         alignItems: 'center',
         paddingVertical: 20,
@@ -206,7 +347,6 @@ const styles = StyleSheet.create({
         width: 64,
         height: 64,
         borderRadius: 32,
-        backgroundColor: '#ECFDF5',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 16,
@@ -214,7 +354,6 @@ const styles = StyleSheet.create({
     heroAmount: {
         fontSize: 32,
         fontWeight: '800',
-        color: '#0F172A',
         letterSpacing: -1,
     },
     heroStatus: {
@@ -223,61 +362,46 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginTop: 4,
     },
-
-    // Info Grid
     infoGrid: {
         flexDirection: 'row',
         paddingVertical: 20,
         borderTopWidth: 1,
         borderBottomWidth: 1,
-        borderColor: '#F1F5F9',
         marginVertical: 10,
     },
     infoItem: { flex: 1 },
     infoLabel: {
         fontSize: 10,
-        color: '#94A3B8',
         fontWeight: '700',
         letterSpacing: 0.5,
     },
     infoValue: {
         fontSize: 13,
-        color: '#334155',
         fontWeight: '600',
         marginTop: 4,
     },
-
     sectionTitle: {
         fontSize: 14,
         fontWeight: '700',
-        color: '#0F172A',
         marginBottom: 16,
         marginTop: 10,
     },
-
-    // Item List
     itemRow: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         marginBottom: 16,
     },
-    itemName: { fontSize: 15, fontWeight: '500', color: '#334155' },
-    itemQty: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
-    itemPrice: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
-
-    divider: { height: 1, backgroundColor: '#F1F5F9' },
+    itemName: { fontSize: 15, fontWeight: '500' },
+    itemQty: { fontSize: 12, marginTop: 2 },
+    itemPrice: { fontSize: 15, fontWeight: '600' },
     dashedDivider: {
         height: 1,
         borderWidth: 1,
-        borderColor: '#E2E8F0',
         borderStyle: 'dashed',
         marginVertical: 20,
     },
-
-    // Payment Box
     paymentBox: {
-        backgroundColor: '#F8FAFC',
         padding: 16,
         borderRadius: 16,
     },
@@ -286,22 +410,18 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 8,
     },
-    rowLabel: { fontSize: 14, color: '#64748B' },
-    rowValue: { fontSize: 14, color: '#0F172A', fontWeight: '600' },
-    totalLabel: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
-    totalValue: { fontSize: 18, fontWeight: '800', color: '#004AAD' },
-
-    // Footer Buttons
+    rowLabel: { fontSize: 14 },
+    rowValue: { fontSize: 14, fontWeight: '600' },
+    totalLabel: { fontSize: 16, fontWeight: '700' },
+    totalValue: { fontSize: 18, fontWeight: '800' },
     footer: {
         flexDirection: 'row',
         paddingVertical: 20,
         gap: 12,
         borderTopWidth: 1,
-        borderColor: '#F1F5F9',
     },
     primaryBtn: {
         flex: 1.5,
-        backgroundColor: '#0F172A',
         flexDirection: 'row',
         height: 52,
         borderRadius: 14,
@@ -312,7 +432,6 @@ const styles = StyleSheet.create({
     primaryBtnText: { color: '#FFF', fontWeight: '700', fontSize: 15 },
     secondaryBtn: {
         flex: 1,
-        backgroundColor: '#F1F5F9',
         flexDirection: 'row',
         height: 52,
         borderRadius: 14,
@@ -320,5 +439,5 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         gap: 8,
     },
-    secondaryBtnText: { color: '#0F172A', fontWeight: '700', fontSize: 15 },
+    secondaryBtnText: { fontWeight: '700', fontSize: 15 },
 })

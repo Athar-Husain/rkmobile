@@ -3,245 +3,173 @@ import {
     View,
     Text,
     StyleSheet,
-    FlatList,
     Dimensions,
     TouchableOpacity,
     ImageBackground,
+    Animated,
+    Platform,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 
 const { width } = Dimensions.get('window')
-const CARD_WIDTH = width * 0.75
-const CARD_MARGIN = 12
-const FULL_STEP = CARD_WIDTH + CARD_MARGIN
+const CARD_WIDTH = width * 0.82 // Slightly narrower to show a peek of the next card
+const CARD_MARGIN = 10
+const SNAP_INTERVAL = CARD_WIDTH + CARD_MARGIN
 
 const PromoBanner = ({ data }) => {
     const [currentIndex, setCurrentIndex] = useState(0)
     const flatListRef = useRef(null)
-    const timerRef = useRef(null)
+    const scrollX = useRef(new Animated.Value(0)).current
 
-    // Auto-slide logic (10 seconds)
     useEffect(() => {
-        startAutoSlide()
-        return () => stopAutoSlide() // Cleanup on unmount
+        if (!data || data.length <= 1) return
+        const interval = setInterval(() => {
+            const nextIndex = (currentIndex + 1) % data.length
+            flatListRef.current?.scrollToIndex({
+                index: nextIndex,
+                animated: true,
+            })
+        }, 6000)
+        return () => clearInterval(interval)
     }, [currentIndex, data])
 
-    const startAutoSlide = () => {
-        stopAutoSlide()
-        timerRef.current = setInterval(() => {
-            if (data && data.length > 0) {
-                const nextIndex = (currentIndex + 1) % data.length
-                flatListRef.current?.scrollToOffset({
-                    offset: nextIndex * FULL_STEP,
-                    animated: true,
-                })
-            }
-        }, 10000) // 10 seconds
-    }
-
-    const stopAutoSlide = () => {
-        if (timerRef.current) clearInterval(timerRef.current)
-    }
-
-    const onScroll = (event) => {
-        const slideSize = event.nativeEvent.layoutMeasurement.width
-        const index = event.nativeEvent.contentOffset.x / FULL_STEP
-        const roundIndex = Math.round(index)
-        if (roundIndex !== currentIndex) {
-            setCurrentIndex(roundIndex)
-        }
-    }
-
-    const renderItem = ({ item }) => {
-        return (
-            <TouchableOpacity activeOpacity={0.95} style={styles.cardContainer}>
-                <ImageBackground
-                    source={{ uri: item.imageUrl }}
-                    style={styles.backgroundImage}
-                    imageStyle={styles.imageRadius}
+    const renderItem = ({ item }) => (
+        <TouchableOpacity activeOpacity={0.9} style={styles.cardContainer}>
+            <ImageBackground
+                source={{ uri: item.imageUrl }}
+                style={styles.backgroundImage}
+                imageStyle={styles.imageRadius}
+            >
+                <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.7)']}
+                    style={styles.gradient}
                 >
-                    <LinearGradient
-                        colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.7)']}
-                        style={styles.gradientOverlay}
-                    >
-                        <View style={styles.content}>
-                            <View>
-                                {item.description && (
-                                    <Text style={styles.label}>
-                                        {item.description.toUpperCase()}
-                                    </Text>
-                                )}
-                                <Text style={styles.title} numberOfLines={2}>
-                                    {item.title}
+                    <View style={styles.content}>
+                        <Text style={styles.label}>
+                            {item.description?.toUpperCase() || 'OFFER'}
+                        </Text>
+                        <Text style={styles.title} numberOfLines={1}>
+                            {item.title}
+                        </Text>
+
+                        <View style={styles.footer}>
+                            <View style={styles.miniBtn}>
+                                <Text style={styles.btnText}>Shop Now</Text>
+                            </View>
+                            {item.imageAlt && (
+                                <Text style={styles.altText}>
+                                    {item.imageAlt}
                                 </Text>
-                            </View>
-
-                            <View style={styles.footer}>
-                                <TouchableOpacity style={styles.shopBtn}>
-                                    <Text style={styles.shopText}>
-                                        Shop Now
-                                    </Text>
-                                </TouchableOpacity>
-
-                                {item.imageAlt ? (
-                                    <Text style={styles.altText}>
-                                        {item.imageAlt}
-                                    </Text>
-                                ) : null}
-                            </View>
+                            )}
                         </View>
-                    </LinearGradient>
-                </ImageBackground>
-            </TouchableOpacity>
-        )
-    }
+                    </View>
+                </LinearGradient>
+            </ImageBackground>
+        </TouchableOpacity>
+    )
 
     return (
-        <View style={styles.container}>
-            <View style={styles.headerRow}>
-                <Text style={styles.sectionTitle}>Trending Offers</Text>
-
-                {/* Pagination Dots */}
+        <View style={styles.wrapper}>
+            <View style={styles.header}>
+                <Text style={styles.headerTitle}>Trending</Text>
                 <View style={styles.dotContainer}>
-                    {data?.map((_, index) => (
-                        <View
-                            key={index}
-                            style={[
-                                styles.dot,
-                                currentIndex === index
-                                    ? styles.activeDot
-                                    : styles.inactiveDot,
-                            ]}
-                        />
-                    ))}
+                    {data.map((_, i) => {
+                        const dotWidth = scrollX.interpolate({
+                            inputRange: [
+                                (i - 1) * SNAP_INTERVAL,
+                                i * SNAP_INTERVAL,
+                                (i + 1) * SNAP_INTERVAL,
+                            ],
+                            outputRange: [4, 12, 4],
+                            extrapolate: 'clamp',
+                        })
+                        return (
+                            <Animated.View
+                                key={i}
+                                style={[styles.dot, { width: dotWidth }]}
+                            />
+                        )
+                    })}
                 </View>
             </View>
 
-            <FlatList
+            <Animated.FlatList
                 ref={flatListRef}
                 data={data}
                 renderItem={renderItem}
                 keyExtractor={(item) => item._id}
                 horizontal
-                onScroll={onScroll}
-                scrollEventThrottle={16}
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={FULL_STEP}
+                snapToInterval={SNAP_INTERVAL}
                 decelerationRate="fast"
-                contentContainerStyle={styles.listPadding}
-                onScrollBeginDrag={stopAutoSlide} // Pause auto-slide when user touches
-                onScrollEndDrag={startAutoSlide} // Resume when they let go
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 20 }}
+                onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+                    {
+                        useNativeDriver: false,
+                        listener: (e) =>
+                            setCurrentIndex(
+                                Math.round(
+                                    e.nativeEvent.contentOffset.x /
+                                        SNAP_INTERVAL
+                                )
+                            ),
+                    }
+                )}
             />
         </View>
     )
 }
 
 const styles = StyleSheet.create({
-    container: {
-        marginVertical: 10,
-    },
-    headerRow: {
-        paddingHorizontal: 20,
-        marginBottom: 12,
+    wrapper: { marginVertical: 10 },
+    header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        paddingHorizontal: 20,
+        marginBottom: 10,
         alignItems: 'center',
     },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: '800',
-        color: '#1a1a1a',
-        letterSpacing: 0.5,
-    },
-    dotContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
+    headerTitle: { fontSize: 16, fontWeight: '700', color: '#1A1A1A' },
+    dotContainer: { flexDirection: 'row' },
     dot: {
-        height: 6,
-        borderRadius: 3,
-        marginHorizontal: 3,
-    },
-    activeDot: {
-        width: 16,
-        backgroundColor: '#000',
-    },
-    inactiveDot: {
-        width: 6,
-        backgroundColor: '#ccc',
-    },
-    listPadding: {
-        paddingLeft: 20,
-        paddingRight: 20,
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: '#004AAD',
+        marginHorizontal: 2,
     },
     cardContainer: {
         width: CARD_WIDTH,
-        height: 120, // Increased height slightly for better aspect ratio
+        height: 140,
         marginRight: CARD_MARGIN,
-        borderRadius: 20,
-        backgroundColor: '#f0f0f0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
-        elevation: 6,
+        borderRadius: 16,
+        overflow: 'hidden',
     },
-    backgroundImage: {
-        flex: 1,
-        width: '100%',
-        height: '100%',
-    },
-    imageRadius: {
-        borderRadius: 20,
-    },
-    gradientOverlay: {
-        flex: 1,
-        borderRadius: 20,
-        padding: 20,
-        justifyContent: 'flex-end',
-    },
-    content: {
-        flex: 1,
-        justifyContent: 'space-between',
-    },
+    backgroundImage: { flex: 1 },
+    imageRadius: { borderRadius: 16 },
+    gradient: { flex: 1, padding: 15, justifyContent: 'flex-end' },
     label: {
-        color: '#fff',
-        fontSize: 10,
-        fontWeight: 'bold',
-        letterSpacing: 2,
-        marginBottom: 4,
-        opacity: 0.8,
+        color: '#FFD700',
+        fontSize: 9,
+        fontWeight: '800',
+        letterSpacing: 1,
+        marginBottom: 2,
     },
-    title: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#fff',
-        lineHeight: 28,
-        textShadowColor: 'rgba(0, 0, 0, 0.3)',
-        textShadowOffset: { width: 0, height: 1 },
-        textShadowRadius: 4,
-    },
+    title: { color: '#FFF', fontSize: 18, fontWeight: '700' },
     footer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        marginTop: 8,
     },
-    shopBtn: {
-        backgroundColor: '#fff',
-        paddingVertical: 8,
-        paddingHorizontal: 18,
-        borderRadius: 30,
+    miniBtn: {
+        backgroundColor: '#FFF',
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: 6,
     },
-    shopText: {
-        color: '#000',
-        fontWeight: '800',
-        fontSize: 13,
-    },
-    altText: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 12,
-        fontStyle: 'italic',
-    },
+    btnText: { color: '#000', fontSize: 11, fontWeight: '700' },
+    altText: { color: 'rgba(255,255,255,0.5)', fontSize: 10 },
 })
 
 export default PromoBanner

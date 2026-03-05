@@ -16,7 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useDispatch, useSelector } from 'react-redux'
 import { useForm, Controller } from 'react-hook-form'
 import Checkbox from 'expo-checkbox'
-import { OtpInput } from 'react-native-otp-entry' // For the smooth UX
+import { OtpInput } from 'react-native-otp-entry'
 
 // Components
 import Header from '../components/Header'
@@ -50,7 +50,7 @@ const Login = () => {
     const [tempToken, setTempToken] = useState(null)
     const [userIdentifier, setUserIdentifier] = useState('')
     const [countdown, setCountdown] = useState(0)
-    const [otpCode, setOtpCode] = useState('') // Simplified state
+    const [otpCode, setOtpCode] = useState('')
     const [deviceToken, setDeviceToken] = useState(null)
 
     const {
@@ -117,7 +117,6 @@ const Login = () => {
                 setUserIdentifier(id)
                 setCountdown(120)
                 setStep(2)
-
                 if (rememberMe) {
                     await AsyncStorage.setItem(
                         'rememberedUser',
@@ -135,11 +134,7 @@ const Login = () => {
     }
 
     const handleVerifyOTP = async () => {
-        if (otpCode.length !== 6) {
-            Alert.alert('Required', 'Please enter the 6-digit OTP')
-            return
-        }
-
+        if (otpCode.length !== 6) return
         setLoading(true)
         try {
             await dispatch(
@@ -151,20 +146,22 @@ const Login = () => {
                 })
             ).unwrap()
         } catch (error) {
-            setOtpCode('') // Clear on error
+            setOtpCode('')
         } finally {
             setLoading(false)
         }
     }
 
-    /* ---------------- RENDERING ---------------- */
-
     const renderStep1 = () => (
-        <>
-            <Header title="Sign In" onPress={() => navigation.goBack()} />
-
-            <View style={styles.logoContainer}>
-                <Image source={images.logo} style={styles.logo} />
+        <View style={styles.stepContainer}>
+            <View style={styles.headerSection}>
+                <Image
+                    source={images.logo}
+                    style={[
+                        styles.logo,
+                        // { tintColor: colors.primary }
+                    ]}
+                />
                 <Text style={[styles.title, { color: colors.text }]}>
                     Welcome Back
                 </Text>
@@ -173,93 +170,74 @@ const Login = () => {
                 </Text>
             </View>
 
-            <View style={styles.formContainer}>
-                <Controller
-                    control={control}
-                    name="emailOrMobile"
-                    rules={{
-                        required: 'Email or Mobile is required',
-                        pattern: {
-                            value: /^([^\s@]+@[^\s@]+\.[^\s@]+|[6-9]\d{9})$/,
-                            message: 'Enter a valid email or 10-digit mobile',
-                        },
-                    }}
-                    render={({ field: { onChange, value } }) => (
-                        <Input
-                            placeholder="Email or Mobile Number"
-                            icon={icons.user}
-                            value={value}
-                            onInputChanged={(_, v) => onChange(v)}
-                            errorText={errors.emailOrMobile?.message}
-                            autoCapitalize="none"
-                        />
-                    )}
-                />
+            <Controller
+                control={control}
+                name="emailOrMobile"
+                rules={{
+                    required: 'Email or Mobile is required',
+                    pattern: {
+                        value: /^([^\s@]+@[^\s@]+\.[^\s@]+|[6-9]\d{9})$/,
+                        message: 'Enter a valid email or 10-digit mobile',
+                    },
+                }}
+                render={({ field: { onChange, value } }) => (
+                    <Input
+                        placeholder="Email or Mobile Number"
+                        icon={icons.user}
+                        value={value}
+                        onInputChanged={(_, v) => onChange(v)}
+                        errorText={errors.emailOrMobile?.message}
+                        autoCapitalize="none"
+                    />
+                )}
+            />
 
-                <View style={styles.optionsContainer}>
-                    <TouchableOpacity
-                        style={styles.checkboxRow}
-                        onPress={() => setRememberMe(!rememberMe)}
-                        activeOpacity={0.7}
-                    >
-                        <Checkbox
-                            value={rememberMe}
-                            onValueChange={setRememberMe}
-                            color={rememberMe ? COLORS.primary : undefined}
-                            style={styles.checkbox}
-                        />
-                        <Text
-                            style={[styles.optionLabel, { color: colors.text }]}
-                        >
-                            Remember Me
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate('ForgotPassword')}
-                    >
-                        <Text style={styles.linkText}>Forgot Password?</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <Button
-                    title={
-                        loading || authLoading ? 'Sending OTP...' : 'Continue'
-                    }
-                    onPress={handleSubmit(handleSendOTP)}
-                    filled
-                    disabled={loading || authLoading}
-                    style={styles.mainBtn}
-                />
+            <View style={styles.optionsContainer}>
+                <TouchableOpacity
+                    style={styles.checkboxRow}
+                    onPress={() => setRememberMe(!rememberMe)}
+                >
+                    <Checkbox
+                        value={rememberMe}
+                        onValueChange={setRememberMe}
+                        color={rememberMe ? COLORS.primary : undefined}
+                        style={styles.checkbox}
+                    />
+                    <Text style={[styles.optionLabel, { color: colors.text }]}>
+                        Remember Me
+                    </Text>
+                </TouchableOpacity>
+                {/* <TouchableOpacity
+                    onPress={() => navigation.navigate('ForgotPassword')}
+                >
+                    <Text style={styles.linkText}>Forgot Password?</Text>
+                </TouchableOpacity> */}
             </View>
+
+            <Button
+                title={loading || authLoading ? 'Sending OTP...' : 'Continue'}
+                onPress={handleSubmit(handleSendOTP)}
+                filled
+                disabled={loading || authLoading}
+                style={styles.mainBtn}
+            />
 
             <View style={styles.footer}>
                 <Text style={{ color: colors.text, fontSize: 15 }}>
                     Don't have an account?{' '}
                 </Text>
                 <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-                    <Text style={[styles.linkText, { fontSize: 15 }]}>
-                        Sign Up
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    onPress={() => navigation.navigate('LoginStaff')}
-                >
-                    <Text style={[styles.linkText, { fontSize: 15 }]}>
-                        Staff Login
-                    </Text>
+                    <Text style={styles.linkText}>Sign Up</Text>
                 </TouchableOpacity>
             </View>
-        </>
+        </View>
     )
 
     const renderStep2 = () => (
-        <>
-            <Header title="Verify Identity" onPress={() => setStep(1)} />
-
-            <View style={styles.logoContainer}>
-                <Image source={images.logo} style={styles.logo} />
+        <View style={styles.stepContainer}>
+            <View style={styles.headerSection}>
                 <Text style={[styles.title, { color: colors.text }]}>
-                    Verification Code
+                    Verify Identity
                 </Text>
                 <Text style={[styles.subtitle, { color: colors.grayscale700 }]}>
                     Sent to{' '}
@@ -267,14 +245,19 @@ const Login = () => {
                         {userIdentifier}
                     </Text>
                 </Text>
+                <TouchableOpacity
+                    onPress={() => setStep(1)}
+                    style={{ marginTop: 8 }}
+                >
+                    <Text style={styles.editLink}>Edit Contact Info</Text>
+                </TouchableOpacity>
             </View>
 
             <View style={styles.otpSection}>
                 <OtpInput
                     numberOfDigits={6}
                     focusColor={COLORS.primary}
-                    focusStickBlinkingDuration={500}
-                    onTextChange={(text) => setOtpCode(text)}
+                    onTextChange={setOtpCode}
                     theme={{
                         pinCodeContainerStyle: {
                             backgroundColor: dark
@@ -285,12 +268,12 @@ const Login = () => {
                                 : COLORS.grayscale200,
                             borderRadius: 12,
                             width: 48,
-                            height: 55,
+                            height: 56,
                         },
                         pinCodeTextStyle: {
                             color: colors.text,
                             fontSize: 22,
-                            fontWeight: '700',
+                            fontFamily: 'bold',
                         },
                     }}
                 />
@@ -298,19 +281,9 @@ const Login = () => {
 
             <View style={styles.resendWrapper}>
                 {countdown > 0 ? (
-                    <Text
-                        style={{
-                            color: colors.text,
-                            opacity: 0.7,
-                            fontSize: 15,
-                        }}
-                    >
+                    <Text style={{ color: colors.text, opacity: 0.7 }}>
                         Resend code in{' '}
-                        <Text
-                            style={{ color: COLORS.primary, fontWeight: '700' }}
-                        >
-                            {countdown}s
-                        </Text>
+                        <Text style={styles.timerText}>{countdown}s</Text>
                     </Text>
                 ) : (
                     <TouchableOpacity
@@ -330,13 +303,17 @@ const Login = () => {
                 disabled={loading || otpCode.length < 6}
                 style={styles.mainBtn}
             />
-        </>
+        </View>
     )
 
     return (
         <SafeAreaView
             style={[styles.area, { backgroundColor: colors.background }]}
         >
+            <Header
+                title={step === 1 ? 'Sign In' : 'Verification'}
+                onPress={() => (step === 1 ? navigation.goBack() : setStep(1))}
+            />
             <KeyboardAvoidingView
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={{ flex: 1 }}
@@ -354,27 +331,48 @@ const Login = () => {
 
 const styles = StyleSheet.create({
     area: { flex: 1 },
-    scrollContainer: { paddingHorizontal: 24, paddingBottom: 40 },
-    logoContainer: { alignItems: 'center', marginTop: 40, marginBottom: 30 },
-    logo: { width: 120, height: 120, resizeMode: 'contain', marginBottom: 20 },
-    title: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
-    subtitle: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
-    formContainer: { width: '100%' },
+    scrollContainer: {
+        paddingHorizontal: 24,
+        paddingBottom: 40,
+        flexGrow: 1,
+        justifyContent: 'center',
+    },
+    stepContainer: { width: '100%' },
+    headerSection: { alignItems: 'center', marginBottom: 32 },
+    logo: { width: 150, height: 150, resizeMode: 'contain', marginBottom: 16 },
+
+    title: {
+        fontSize: 28,
+        fontFamily: 'bold',
+        marginBottom: 8,
+        textAlign: 'center',
+    },
+    subtitle: {
+        fontSize: 15,
+        textAlign: 'center',
+        lineHeight: 22,
+        fontFamily: 'regular',
+    },
     optionsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginVertical: 20,
+        marginVertical: 24,
     },
     checkboxRow: { flexDirection: 'row', alignItems: 'center' },
     checkbox: { width: 20, height: 20, borderRadius: 6 },
-    optionLabel: { marginLeft: 10, fontSize: 14, fontWeight: '500' },
-    linkText: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
-    mainBtn: { marginTop: 10, borderRadius: 32, height: 56 },
-    footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 40 },
-    // OTP UX
-    otpSection: { marginVertical: 30, width: '100%' },
-    resendWrapper: { alignItems: 'center', marginBottom: 30 },
+    optionLabel: { marginLeft: 10, fontSize: 14, fontFamily: 'medium' },
+    linkText: { color: COLORS.primary, fontFamily: 'bold', fontSize: 15 },
+    editLink: {
+        color: COLORS.primary,
+        textDecorationLine: 'underline',
+        fontFamily: 'medium',
+    },
+    mainBtn: { height: 56, borderRadius: 16, marginTop: 10 },
+    footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 32 },
+    otpSection: { marginVertical: 32 },
+    resendWrapper: { alignItems: 'center', marginBottom: 32 },
+    timerText: { color: COLORS.primary, fontFamily: 'bold' },
 })
 
 export default Login

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useRef } from 'react' // Added useRef
 import {
     View,
     Text,
@@ -8,272 +8,397 @@ import {
     ScrollView,
     SafeAreaView,
     StatusBar,
+    Pressable,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
-import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
+import { Feather } from '@expo/vector-icons'
 import { images, COLORS } from '../constants'
 import { useTheme } from '../theme/ThemeProvider'
 import { useDispatch, useSelector } from 'react-redux'
 import { logout } from '../redux/features/Auth/AuthSlice'
+import RBSheet from 'react-native-raw-bottom-sheet' // Import RBSheet
 
 const Profile = () => {
     const navigation = useNavigation()
     const dispatch = useDispatch()
-    const { dark, colors } = useTheme()
+    const refRBSheet = useRef() // Create ref for bottom sheet
+    const { dark } = useTheme()
     const { user } = useSelector((state) => state.auth)
 
-    const textColor = dark ? COLORS.white : COLORS.greyscale900
-    const cardBg = dark ? COLORS.dark2 : COLORS.white
+    const handleLogout = async () => {
+        try {
+            await dispatch(logout()).unwrap()
+            refRBSheet.current.close()
+        } catch (error) {
+            console.error('Logout failed', error)
+        }
+    }
 
-    const handleLogout = () => dispatch(logout())
-
-    const ProfileCardItem = ({ icon, label, onPress, value }) => (
-        <TouchableOpacity
-            style={[styles.card, { backgroundColor: cardBg }]}
+    const ProfileActionRow = ({ icon, label, onPress, value, isLast }) => (
+        <Pressable
             onPress={onPress}
+            style={({ pressed }) => [
+                styles.row,
+                pressed && styles.rowPressed,
+                isLast && { borderBottomWidth: 0 },
+            ]}
         >
-            <View style={styles.cardLeft}>
+            <View style={styles.rowLeft}>
                 <View
                     style={[
-                        styles.iconCircle,
-                        {
-                            backgroundColor: dark
-                                ? COLORS.dark3
-                                : COLORS.tansparentPrimary,
-                        },
+                        styles.iconWrapper,
+                        { backgroundColor: dark ? '#2C2C2E' : '#F2F2F7' },
                     ]}
                 >
-                    <MaterialCommunityIcons
+                    <Feather
                         name={icon}
-                        size={22}
-                        color={COLORS.primary}
+                        size={18}
+                        color={dark ? COLORS.white : '#1C1C1E'}
                     />
                 </View>
-                <Text style={[styles.cardLabel, { color: textColor }]}>
+                <Text
+                    style={[
+                        styles.rowLabel,
+                        { color: dark ? COLORS.white : '#1C1C1E' },
+                    ]}
+                >
                     {label}
                 </Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                {value && <Text style={styles.cardValue}>{value}</Text>}
-                <MaterialCommunityIcons
+            <View style={styles.rowRight}>
+                {value && <Text style={styles.rowValue}>{value}</Text>}
+                <Feather
                     name="chevron-right"
-                    size={24}
-                    color={COLORS.greyscale400}
+                    size={16}
+                    color={COLORS.greyscale500}
                 />
             </View>
-        </TouchableOpacity>
+        </Pressable>
     )
 
     return (
         <SafeAreaView
             style={[
                 styles.container,
-                {
-                    backgroundColor: dark
-                        ? colors.background
-                        : COLORS.tertiaryWhite,
-                },
+                { backgroundColor: dark ? COLORS.black : '#F2F2F7' },
             ]}
         >
             <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
 
-            <View style={styles.header}>
+            {/* Top Navigation Bar */}
+            <View style={styles.navBar}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={styles.roundBtn}
+                    style={styles.navBtn}
                 >
-                    <MaterialCommunityIcons
+                    <Feather
                         name="arrow-left"
                         size={24}
-                        color={textColor}
+                        color={dark ? COLORS.white : COLORS.black}
                     />
                 </TouchableOpacity>
-                {/* <TouchableOpacity
-                    onPress={() => navigation.navigate('MyBookings')}
-                    style={styles.roundBtn}
+                <Text
+                    style={[
+                        styles.navTitle,
+                        { color: dark ? COLORS.white : COLORS.black },
+                    ]}
                 >
-                    <MaterialCommunityIcons
-                        name="arrow-left"
-                        size={24}
-                        color={textColor}
-                    />
-                </TouchableOpacity> */}
-                <Text style={[styles.headerTitle, { color: textColor }]}>
                     My Profile
                 </Text>
-                <TouchableOpacity style={styles.roundBtn}>
-                    <MaterialCommunityIcons
-                        name="cog-outline"
-                        size={24}
-                        color={textColor}
+                <TouchableOpacity style={styles.navBtn}>
+                    <Feather
+                        name="settings"
+                        size={22}
+                        color={dark ? COLORS.white : COLORS.black}
                     />
                 </TouchableOpacity>
             </View>
 
             <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: 40 }}
+                contentContainerStyle={styles.scrollPadding}
             >
-                {/* Profile Hero Section */}
+                {/* Modern Hero Section */}
                 <View style={styles.heroSection}>
-                    <View style={styles.imageContainer}>
-                        <Image
-                            source={images.user5}
-                            style={styles.mainAvatar}
-                        />
-                        <TouchableOpacity style={styles.editFab}>
-                            <MaterialCommunityIcons
-                                name="pencil"
-                                size={14}
+                    <View style={styles.avatarWrapper}>
+                        <Image source={images.user5} style={styles.avatar} />
+                        <TouchableOpacity style={styles.editBadge}>
+                            <Feather
+                                name="camera"
+                                size={12}
                                 color={COLORS.white}
                             />
                         </TouchableOpacity>
                     </View>
-                    <Text style={[styles.userName, { color: textColor }]}>
-                        {user?.name || 'Customer Name'}
+                    <Text
+                        style={[
+                            styles.userName,
+                            { color: dark ? COLORS.white : '#1C1C1E' },
+                        ]}
+                    >
+                        {user?.name || 'Julian Casablancas'}
                     </Text>
-                    <Text style={styles.userEmail}>
-                        {user?.email || 'customer@example.com'}
-                    </Text>
+                    <View style={styles.membershipBadge}>
+                        <Feather name="zap" size={10} color="#FFD700" />
+                        <Text style={styles.membershipText}>
+                            PLATINUM MEMBER
+                        </Text>
+                    </View>
                 </View>
 
-                {/* Account Actions Section */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionHeader}>
-                        Account Information
-                    </Text>
-                    <ProfileCardItem
-                        icon="account-circle-outline"
-                        label="Personal Info"
-                        onPress={() => {}}
-                    />
-                    <ProfileCardItem
-                        icon="wallet-outline"
+                {/* Section: Finance */}
+                <Text style={styles.sectionLabel}>Finance & Orders</Text>
+                <View
+                    style={[
+                        styles.groupCard,
+                        { backgroundColor: dark ? '#1C1C1E' : COLORS.white },
+                    ]}
+                >
+                    {/* <ProfileActionRow
+                        icon="pocket"
                         label="My Wallet"
-                        value="₹5,240"
+                        value="₹5,240.00"
                         onPress={() => {}}
-                    />
-                    <ProfileCardItem
-                        icon="shopping-outline"
+                    /> */}
+                    <ProfileActionRow
+                        icon="shopping-bag"
                         label="Order History"
                         onPress={() => {}}
+                        isLast
                     />
                 </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.sectionHeader}>Preferences</Text>
-                    <ProfileCardItem
-                        icon="map-marker-radius-outline"
-                        label="Shipping Address"
-                        onPress={() => {}}
-                    />
-                    <ProfileCardItem
-                        icon="heart-outline"
-                        label="My Wishlist"
-                        onPress={() => {}}
-                    />
-                </View>
-
-                <TouchableOpacity
-                    style={styles.logoutButton}
-                    onPress={handleLogout}
+                {/* Section: Personal */}
+                <Text style={styles.sectionLabel}>Personal</Text>
+                <View
+                    style={[
+                        styles.groupCard,
+                        { backgroundColor: dark ? '#1C1C1E' : COLORS.white },
+                    ]}
                 >
-                    <Text style={styles.logoutButtonText}>
-                        Log Out fr Account
-                    </Text>
+                    <ProfileActionRow
+                        icon="user"
+                        label="Personal Information"
+                        onPress={() => {}}
+                    />
+                    <ProfileActionRow
+                        icon="map-pin"
+                        label="Shipping Addresses"
+                        onPress={() => {}}
+                    />
+                    <ProfileActionRow
+                        icon="heart"
+                        label="Wishlist"
+                        onPress={() => {}}
+                        isLast
+                    />
+                </View>
+
+                {/* Log Out Button triggers RBSheet */}
+                <TouchableOpacity
+                    style={styles.logoutBtn}
+                    onPress={() => refRBSheet.current.open()}
+                >
+                    <Text style={styles.logoutText}>Sign Out</Text>
                 </TouchableOpacity>
+
+                <Text style={styles.footerText}>User ID: 882910293</Text>
             </ScrollView>
+
+            {/* Sign Out Confirmation Sheet */}
+            <RBSheet
+                ref={refRBSheet}
+                closeOnDragDown={true}
+                height={220}
+                customStyles={{
+                    container: {
+                        borderTopRightRadius: 28,
+                        borderTopLeftRadius: 28,
+                        backgroundColor: dark ? '#1C1C1E' : COLORS.white,
+                    },
+                    draggableIcon: {
+                        backgroundColor: dark ? '#3A3A3C' : '#D1D1D6',
+                    },
+                }}
+            >
+                <View style={styles.sheetContent}>
+                    <Text
+                        style={[
+                            styles.sheetTitle,
+                            { color: dark ? COLORS.white : '#000' },
+                        ]}
+                    >
+                        Sign Out?
+                    </Text>
+                    <Text style={styles.sheetSubtitle}>
+                        Are you sure you want to log out of your account?
+                    </Text>
+                    <View style={styles.sheetOptions}>
+                        <Pressable
+                            style={[
+                                styles.modalBtn,
+                                {
+                                    backgroundColor: dark
+                                        ? '#2C2C2E'
+                                        : '#F2F2F7',
+                                },
+                            ]}
+                            onPress={() => refRBSheet.current.close()}
+                        >
+                            <Text
+                                style={[
+                                    styles.modalBtnText,
+                                    { color: dark ? COLORS.white : '#000' },
+                                ]}
+                            >
+                                Cancel
+                            </Text>
+                        </Pressable>
+                        <Pressable
+                            style={[
+                                styles.modalBtn,
+                                { backgroundColor: '#FF3B30' },
+                            ]}
+                            onPress={handleLogout}
+                        >
+                            <Text
+                                style={[
+                                    styles.modalBtnText,
+                                    { color: 'white' },
+                                ]}
+                            >
+                                Sign Out
+                            </Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </RBSheet>
         </SafeAreaView>
     )
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: {
+    navBar: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 20,
+        paddingHorizontal: 16,
+        height: 60,
     },
-    headerTitle: { fontSize: 20, fontFamily: 'bold' },
-    roundBtn: {
+    navTitle: { fontSize: 17, fontFamily: 'bold' },
+    navBtn: {
         width: 40,
         height: 40,
-        borderRadius: 20,
-        alignItems: 'center',
         justifyContent: 'center',
+        alignItems: 'center',
     },
-    heroSection: { alignItems: 'center', paddingVertical: 20 },
-    imageContainer: { position: 'relative', marginBottom: 15 },
-    mainAvatar: {
-        width: 110,
-        height: 110,
-        borderRadius: 55,
-        borderWidth: 4,
-        borderColor: COLORS.white,
-    },
-    editFab: {
+
+    scrollPadding: { paddingHorizontal: 16, paddingBottom: 40 },
+
+    heroSection: { alignItems: 'center', marginVertical: 30 },
+    avatarWrapper: { position: 'relative', marginBottom: 16 },
+    avatar: { width: 100, height: 100, borderRadius: 50 },
+    editBadge: {
         position: 'absolute',
-        bottom: 5,
-        right: 5,
-        backgroundColor: COLORS.primary,
+        bottom: 2,
+        right: 2,
+        backgroundColor: '#007AFF',
         width: 28,
         height: 28,
         borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 2,
-        borderColor: COLORS.white,
+        borderWidth: 3,
+        borderColor: '#F2F2F7',
     },
-    userName: { fontSize: 24, fontFamily: 'bold' },
-    userEmail: { fontSize: 14, color: COLORS.greyscale600, marginTop: 4 },
-    section: { marginTop: 25, paddingHorizontal: 20 },
-    sectionHeader: {
-        fontSize: 13,
+    userName: { fontSize: 24, fontFamily: 'bold', letterSpacing: -0.5 },
+    membershipBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#1C1C1E',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginTop: 8,
+        gap: 5,
+    },
+    membershipText: {
+        color: '#FFD700',
+        fontSize: 10,
         fontFamily: 'bold',
-        color: COLORS.greyscale500,
-        marginBottom: 12,
-        marginLeft: 5,
-        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
-    card: {
+
+    sectionLabel: {
+        fontSize: 12,
+        color: '#8E8E93',
+        textTransform: 'uppercase',
+        marginLeft: 12,
+        marginBottom: 8,
+        letterSpacing: 1,
+    },
+    groupCard: { borderRadius: 16, overflow: 'hidden', marginBottom: 25 },
+
+    row: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 15,
-        borderRadius: 20,
-        marginBottom: 12,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#38383A40',
     },
-    cardLeft: { flexDirection: 'row', alignItems: 'center' },
-    iconCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
+    rowPressed: { backgroundColor: '#38383A10' },
+    rowLeft: { flexDirection: 'row', alignItems: 'center' },
+    iconWrapper: {
+        width: 34,
+        height: 34,
+        borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 15,
     },
-    cardLabel: { fontSize: 16, fontFamily: 'semiBold' },
-    cardValue: {
-        fontSize: 14,
-        color: COLORS.primary,
-        fontFamily: 'bold',
-        marginRight: 8,
-    },
-    logoutButton: {
-        marginHorizontal: 20,
-        marginTop: 30,
-        backgroundColor: 'rgba(255, 71, 71, 0.1)',
-        paddingVertical: 18,
-        borderRadius: 20,
+    rowLabel: { fontSize: 16, marginLeft: 14, fontFamily: 'medium' },
+    rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    rowValue: { fontSize: 15, color: '#8E8E93' },
+
+    logoutBtn: {
+        marginTop: 10,
+        backgroundColor: '#FF3B3010',
+        paddingVertical: 16,
+        borderRadius: 16,
         alignItems: 'center',
     },
-    logoutButtonText: { color: COLORS.red, fontFamily: 'bold', fontSize: 16 },
+    logoutText: { color: '#FF3B30', fontSize: 16, fontFamily: 'bold' },
+    footerText: {
+        textAlign: 'center',
+        color: '#8E8E93',
+        fontSize: 11,
+        marginTop: 24,
+    },
+
+    // Sheet Styles
+    sheetContent: {
+        paddingHorizontal: 24,
+        paddingBottom: 24,
+        alignItems: 'center',
+    },
+    sheetTitle: { fontSize: 20, fontFamily: 'bold', marginBottom: 8 },
+    sheetSubtitle: {
+        fontSize: 14,
+        color: '#8E8E93',
+        textAlign: 'center',
+        marginBottom: 24,
+    },
+    sheetOptions: { flexDirection: 'row', gap: 12, width: '100%' },
+    modalBtn: {
+        flex: 1,
+        height: 52,
+        borderRadius: 16,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    modalBtnText: { fontSize: 16, fontFamily: 'bold' },
 })
 
 export default Profile

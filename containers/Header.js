@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import {
     View,
     Text,
@@ -7,23 +7,29 @@ import {
     StyleSheet,
     Platform,
 } from 'react-native'
-import { images, COLORS, icons } from '../constants'
-import { useTheme } from '../theme/ThemeProvider'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useSelector } from 'react-redux'
 import { useNavigation } from '@react-navigation/native'
+import { images, COLORS, icons } from '../constants'
+import { useTheme } from '../theme/ThemeProvider'
 
 const Header = () => {
     const navigation = useNavigation()
+    const insets = useSafeAreaInsets()
     const { dark, colors } = useTheme()
     const { user } = useSelector((state) => state.auth)
 
-    // Dynamic styles based on theme
-    const iconColor = dark ? COLORS.white : COLORS.greyscale900
-    const textColor = dark ? COLORS.white : COLORS.greyscale900
+    // 1. Dynamic Greeting Logic
+    const greeting = useMemo(() => {
+        const hour = new Date().getHours()
+        if (hour < 12) return 'Good Morning'
+        if (hour < 17) return 'Good Afternoon'
+        return 'Good Evening'
+    }, [])
 
-    // Distinguishing styles
-    const backgroundColor = dark ? colors.background : COLORS.white
-    // const borderBottomColor = dark ? COLORS.greyscale800 : COLORS.greyscale200
+    // 2. Theme-Based Calculations
+    const iconColor = colors.text
+    const backgroundColor = colors.background
 
     return (
         <View
@@ -31,58 +37,85 @@ const Header = () => {
                 styles.headerContainer,
                 {
                     backgroundColor: backgroundColor,
-                    // borderBottomColor: borderBottomColor,
+                    paddingTop: insets.top > 0 ? insets.top : 12, // Native Safe Area Handling
+                    borderBottomColor: dark
+                        ? COLORS.dark3
+                        : COLORS.grayscale200,
                 },
             ]}
         >
-            {/* LEFT: User Profile & Greeting */}
+            {/* LEFT: User Identity */}
             <View style={styles.headerLeft}>
                 <TouchableOpacity
                     onPress={() => navigation.navigate('Profile')}
-                    activeOpacity={0.7}
+                    activeOpacity={0.8}
+                    style={styles.avatarWrapper}
                 >
                     <Image
-                        source={images.user5}
+                        source={
+                            user?.profileImage
+                                ? { uri: user.profileImage }
+                                : images.user5
+                        }
                         resizeMode="cover"
-                        style={styles.avatar}
+                        style={[
+                            styles.avatar,
+                            {
+                                borderColor: dark
+                                    ? COLORS.dark3
+                                    : COLORS.grayscale200,
+                            },
+                        ]}
                     />
+                    <View style={styles.onlineStatus} />
                 </TouchableOpacity>
                 <View style={styles.textContainer}>
                     <Text
                         style={[
                             styles.greeting,
-                            { color: COLORS.grayscale600 },
+                            { color: colors.grayscale700 },
                         ]}
                     >
-                        Hello,
+                        {greeting},
                     </Text>
                     <Text
-                        style={[styles.username, { color: textColor }]}
+                        style={[styles.username, { color: colors.text }]}
                         numberOfLines={1}
                     >
-                        {user?.name || 'Guest'}
+                        {user?.name?.split(' ')[0] || 'Guest'}
                     </Text>
                 </View>
             </View>
 
-            {/* CENTER: Company Logo */}
+            {/* CENTER: Branding */}
             <View style={styles.logoContainer}>
                 <Image
                     source={images.logo}
-                    style={styles.logo}
+                    style={[
+                        styles.logo,
+                        { tintColor: dark ? COLORS.white : undefined },
+                    ]}
                     resizeMode="contain"
                 />
             </View>
 
-            {/* RIGHT: Navigation Icons */}
+            {/* RIGHT: Actions */}
             <View style={styles.headerRight}>
-                {/* <TouchableOpacity
+                <TouchableOpacity
                     onPress={() => navigation.navigate('Notifications')}
-                    style={styles.iconBtn}
+                    activeOpacity={0.7}
+                    style={[
+                        styles.iconBtn,
+                        {
+                            backgroundColor: dark
+                                ? COLORS.dark2
+                                : COLORS.secondaryWhite,
+                        },
+                    ]}
                 >
                     <Image
                         source={icons.bell}
-                        style={[styles.bellIcon, { tintColor: iconColor }]}
+                        style={[styles.icon, { tintColor: iconColor }]}
                         resizeMode="contain"
                     />
                     <View
@@ -91,15 +124,26 @@ const Header = () => {
                             { borderColor: backgroundColor },
                         ]}
                     />
-                </TouchableOpacity> */}
+                </TouchableOpacity>
+                {/* <Text>
+                    checking
+                </Text> */}
 
                 <TouchableOpacity
                     onPress={() => navigation.navigate('Menu')}
-                    style={styles.iconBtn}
+                    activeOpacity={0.7}
+                    style={[
+                        styles.iconBtn,
+                        {
+                            backgroundColor: dark
+                                ? COLORS.dark2
+                                : COLORS.secondaryWhite,
+                        },
+                    ]}
                 >
                     <Image
                         source={icons.more}
-                        style={[styles.menuIcon, { tintColor: iconColor }]}
+                        style={[styles.icon, { tintColor: iconColor }]}
                         resizeMode="contain"
                     />
                 </TouchableOpacity>
@@ -114,77 +158,89 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 16,
-        paddingTop: Platform.OS === 'ios' ? 10 : 12, // Handle safe area padding
         paddingBottom: 12,
-        // borderColor: '#0000006a',
-        // borderBottomWidth: 1,
-        // Shadow for iOS
-        shadowColor: '#ffffff6a',
+        // Elevation/Shadow for a "Floating" feel
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3,
-        // Shadow for Android
-        elevation: 5,
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
+        borderBottomWidth: 0.5,
     },
     headerLeft: {
-        flex: 1.2,
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
     },
+    avatarWrapper: {
+        position: 'relative',
+    },
     avatar: {
-        width: 42,
-        height: 42,
-        borderRadius: 12,
+        width: 44,
+        height: 44,
+        borderRadius: 14,
         borderWidth: 1,
-        borderColor: COLORS.greyscale200,
+    },
+    onlineStatus: {
+        position: 'absolute',
+        bottom: 0,
+        right: 0,
+        width: 12,
+        height: 12,
+        borderRadius: 6,
+        backgroundColor: '#4ADE80',
+        borderWidth: 2,
+        borderColor: '#FFF',
     },
     textContainer: {
         marginLeft: 10,
     },
     greeting: {
-        fontSize: 11,
-        fontFamily: 'regular',
+        fontSize: 10,
+        fontFamily: 'medium',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
     username: {
         fontFamily: 'bold',
-        fontSize: 14,
+        fontSize: 15,
+        marginTop: -2,
     },
     logoContainer: {
-        flex: 1,
+        flex: 0.8,
         alignItems: 'center',
         justifyContent: 'center',
     },
     logo: {
-        width: 110,
-        height: 45,
+        width: 90,
+        height: 35,
     },
     headerRight: {
-        flex: 1.2,
+        flex: 1,
         flexDirection: 'row',
         justifyContent: 'flex-end',
         alignItems: 'center',
     },
     iconBtn: {
-        marginLeft: 12,
-        padding: 6,
-        backgroundColor: 'transparent',
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 8,
     },
-    menuIcon: {
-        width: 24,
-        height: 24,
-    },
-    bellIcon: {
-        width: 24,
-        height: 24,
+    icon: {
+        width: 20,
+        height: 20,
     },
     notiBadge: {
         position: 'absolute',
-        width: 10,
-        height: 10,
-        borderRadius: 5,
+        width: 9,
+        height: 9,
+        borderRadius: 4.5,
         backgroundColor: COLORS.red,
-        right: 8,
-        top: 8,
+        right: 10,
+        top: 10,
         borderWidth: 1.5,
     },
 })

@@ -1,8 +1,5 @@
-// app / screens / Home.js
-
 import React, { useEffect, useMemo, useCallback } from 'react'
 import {
-    ScrollView,
     StyleSheet,
     View,
     SafeAreaView,
@@ -10,8 +7,12 @@ import {
     ActivityIndicator,
     RefreshControl,
     Text,
+    Platform,
+    FlatList,
 } from 'react-native'
 import { useDispatch, useSelector } from 'react-redux'
+import { useTheme } from '../theme/ThemeProvider'
+import * as Haptics from 'expo-haptics'
 
 // Actions
 import {
@@ -25,16 +26,19 @@ import {
 import { fetchPromotionsForUser } from '../redux/features/Promotion/PromotionSlice'
 import { fetchFeaturedProducts } from '../redux/features/Products/ProductSlice'
 
+// Components
 import Header from '../containers/Header'
 import PromotionCarousel from '../containers/Home/PromotionCarousel'
 import PromoBanner from '../containers/Home/PromoBanner'
 import CouponCarousel from '../containers/Home/CouponCarousel'
-import ProductGrid from '../containers/Home/ProductGrid'
+import ProductCard from '../components/ProductCard' // Assume a memoized card exists
 import { COLORS } from '../constants'
 
 const Home = ({ navigation }) => {
     const dispatch = useDispatch()
+    const { colors, dark } = useTheme()
 
+    // Selectors
     const { activeBanners, isLoading: homeLoading } = useSelector(
         (state) => state.home
     )
@@ -48,21 +52,9 @@ const Home = ({ navigation }) => {
         (state) => state.product
     )
 
-    // FIX: Only block the UI if we have absolutely NO data.
-    // If we have products, we show the screen and let RefreshControl show the spinner.
-    const isInitialLoading =
-        (isFetchingFeatured || homeLoading) && featuredProducts.length === 0
-
-    // Refreshing state for the Pull-to-Refresh
-    const isRefreshing =
-        homeLoading ||
-        isCouponLoading ||
-        isPromotionLoading ||
-        isFetchingFeatured
-
     const loadAllData = useCallback(() => {
         dispatch(fetchActiveBanners())
-        dispatch(fetchActivePromotions()) // Added this back
+        dispatch(fetchActivePromotions())
         dispatch(fetchActiveCoupons())
         dispatch(fetchDiscoverCoupons())
         dispatch(fetchPromotionsForUser())
@@ -71,45 +63,47 @@ const Home = ({ navigation }) => {
 
     useEffect(() => {
         loadAllData()
-    }, []) // Empty array to prevent the nav-loop
+    }, [loadAllData])
 
+    const isRefreshing = useMemo(
+        () =>
+            homeLoading ||
+            isCouponLoading ||
+            isPromotionLoading ||
+            isFetchingFeatured,
+        [homeLoading, isCouponLoading, isPromotionLoading, isFetchingFeatured]
+    )
+
+    // Data Processing (Memoized to prevent re-renders)
     const uniqueCoupons = useMemo(() => {
         const combined = [...(activeCoupons || []), ...(discoverCoupons || [])]
-        return Array.from(
-            new Map(combined.map((item) => [item._id, item])).values()
-        )
+        const map = new Map()
+        combined.forEach((item) => {
+            if (item._id) map.set(item._id, item)
+        })
+        return Array.from(map.values())
     }, [activeCoupons, discoverCoupons])
 
-    if (isInitialLoading) {
-        return (
-            <SafeAreaView style={styles.center}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-                <Text style={styles.loadingText}>
-                    Curating your experience... 
-                </Text>
-            </SafeAreaView>
-        )
-    }
-
-    return (
-        <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-            <Header />
-            <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={isRefreshing}
-                        onRefresh={loadAllData}
-                        colors={[COLORS.primary]}
-                        tintColor={COLORS.primary}
-                    />
+    // Performance Optimized RenderItem
+    const renderProduct = useCallback(
+        ({ item }) => (
+            <ProductCard
+                item={item}
+                onPress={() =>
+                    navigation.navigate('ProductDetails', { id: item._id })
                 }
-            >
-                <View style={styles.section}>
+            />
+        ),
+        [navigation]
+    )
+
+    // --- The Secret Sauce: ListHeaderComponent ---
+    const renderHeader = useMemo(
+        () => (
+            <View style={styles.headerContainer}>
+                {promotions?.length > 0 && (
                     <PromotionCarousel data={promotions} />
-                </View>
+                )}
 
                 <View style={styles.section}>
                     <CouponCarousel
@@ -119,56 +113,71 @@ const Home = ({ navigation }) => {
                 </View>
 
                 {activeBanners?.length > 0 && (
-                    <View style={styles.bannerSection}>
-                        <PromoBanner data={activeBanners} />
-                    </View>
+                    <PromoBanner data={activeBanners} />
                 )}
 
-                <View style={styles.productSection}>
-                    <View style={styles.sectionHeader}>
-                        <Text style={styles.sectionTitle}>
-                            Featured for You
-                        </Text>
-                        <Text style={styles.sectionSubtitle}>
-                            Handpicked premium products
-                        </Text>
-                    </View>
-                    <ProductGrid
-                        products={featuredProducts}
-                        onProductPress={(item) =>
-                            navigation.navigate('ProductDetails', {
-                                id: item._id,
-                            })
-                        }
-                    />
+                <View style={styles.productSectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                        Featured for You
+                    </Text>
+                    <Text style={styles.sectionSubtitle}>
+                        Handpicked premium products
+                    </Text>
                 </View>
-                <View style={{ height: 60 }} />
-            </ScrollView>
+            </View>
+        ),
+        [promotions, uniqueCoupons, activeBanners, colors.text, navigation]
+    )
+
+    return (
+        <SafeAreaView
+            style={[styles.container, { backgroundColor: colors.background }]}
+        >
+            <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} />
+            <Header />
+
+            <FlatList
+                data={featuredProducts}
+                renderItem={renderProduct}
+                keyExtractor={(item) => item._id}
+                ListHeaderComponent={renderHeader}
+                numColumns={2} // Efficiently handles the grid
+                columnWrapperStyle={styles.columnWrapper}
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.listContent}
+                // PERFORMANCE PROPS
+                removeClippedSubviews={true}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                initialNumToRender={6}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={loadAllData}
+                        tintColor={COLORS.primary}
+                    />
+                }
+                ListFooterComponent={<View style={{ height: 80 }} />}
+            />
         </SafeAreaView>
     )
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#F8F9FA' },
-    center: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: '#fff',
+    container: { flex: 1 },
+    headerContainer: { width: '100%' },
+    listContent: { paddingBottom: 20 },
+    columnWrapper: {
+        justifyContent: 'space-between',
+        paddingHorizontal: 15,
     },
-    loadingText: {
-        marginTop: 15,
-        fontSize: 14,
-        color: '#666',
-        fontWeight: '500',
+    section: { marginBottom: 15 },
+    productSectionHeader: {
+        paddingHorizontal: 20,
+        marginVertical: 12,
     },
-    scrollContent: { paddingBottom: 20 },
-    section: { marginBottom: 5 },
-    bannerSection: { marginVertical: 5, paddingHorizontal: 5 },
-    productSection: { marginTop: 5 },
-    sectionHeader: { paddingHorizontal: 20, marginBottom: 15 },
-    sectionTitle: { fontSize: 22, fontWeight: '800', color: '#000' },
-    sectionSubtitle: { fontSize: 13, color: '#666', marginTop: 2 },
+    sectionTitle: { fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+    sectionSubtitle: { fontSize: 11, color: '#8E8E93', marginTop: 1 },
 })
 
 export default Home

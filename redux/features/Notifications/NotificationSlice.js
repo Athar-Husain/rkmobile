@@ -1,124 +1,65 @@
-// src/features/notifications/notificationSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-// import notificationService from '../../api/notificationService.js'
 import { showMessage } from 'react-native-flash-message'
 import notificationService from './NotificationService'
 
-// ========================
-// 🔹 Initial State
-// ========================
 const initialState = {
     notifications: [],
+    unreadCount: 0,
+    pagination: {
+        page: 1,
+        pages: 1,
+        total: 0,
+    },
     isNotificationLoading: false,
     isNotificationError: false,
     isNotificationSuccess: false,
     notificationMessage: '',
 }
 
-// ========================
-// 🔹 Thunks
-// ========================
-
 const getError = (err) =>
     err?.response?.data?.message || err.message || 'Something went wrong'
 
-// Get notifications
 export const getNotifications = createAsyncThunk(
     'notifications/getNotifications',
+    async (params, thunkAPI) => {
+        try {
+            return await notificationService.getMyNotifications(params)
+        } catch (error) {
+            return thunkAPI.rejectWithValue(getError(error))
+        }
+    }
+)
+
+export const markNotificationsRead = createAsyncThunk(
+    'notifications/markRead',
+    async (ids, thunkAPI) => {
+        try {
+            return await notificationService.markNotificationsAsRead(ids)
+        } catch (error) {
+            return thunkAPI.rejectWithValue(getError(error))
+        }
+    }
+)
+
+export const markAllNotificationsRead = createAsyncThunk(
+    'notifications/markAllRead',
     async (_, thunkAPI) => {
         try {
-            return await notificationService.getNotificationsForUser()
+            return await notificationService.markAllNotificationsAsRead()
         } catch (error) {
             return thunkAPI.rejectWithValue(getError(error))
         }
     }
 )
 
-// Send notification to one user
-export const sendNotification = createAsyncThunk(
-    'notifications/send',
-    async (data, thunkAPI) => {
-        try {
-            return await notificationService.sendNotificationToCustomer(data)
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getError(error))
-        }
-    }
-)
-
-// Send notification to all users
-export const sendNotificationToAll = createAsyncThunk(
-    'notifications/sendToAll',
-    async (data, thunkAPI) => {
-        try {
-            return await notificationService.sendNotificationToAllCustomers(
-                data
-            )
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getError(error))
-        }
-    }
-)
-
-// Mark as read
-export const markAsRead = createAsyncThunk(
-    'notifications/markAsRead',
-    async (notificationId, thunkAPI) => {
-        try {
-            return await notificationService.markNotificationAsRead(
-                notificationId
-            )
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getError(error))
-        }
-    }
-)
-
-// Delete notification
-export const deleteNotification = createAsyncThunk(
-    'notifications/delete',
-    async (notificationId, thunkAPI) => {
-        try {
-            await notificationService.deleteNotification(notificationId)
-            return notificationId // return ID for removing it from state
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getError(error))
-        }
-    }
-)
-
-// Register FCM token
-export const registerFCMToken = createAsyncThunk(
-    'notifications/registerToken',
-    async (data, thunkAPI) => {
-        try {
-            return await notificationService.registerCustomerFCMToken(data)
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getError(error))
-        }
-    }
-)
-
-// Unregister FCM token
-export const unregisterFCMToken = createAsyncThunk(
-    'notifications/unregisterToken',
-    async (data, thunkAPI) => {
-        try {
-            return await notificationService.unregisterCustomerFCMToken(data)
-        } catch (error) {
-            return thunkAPI.rejectWithValue(getError(error))
-        }
-    }
-)
-
-// ========================
-// 🔹 Slice
-// ========================
 const notificationSlice = createSlice({
     name: 'notifications',
     initialState,
     reducers: {
         resetNotificationState: (state) => {
+            state.notifications = []
+            state.unreadCount = 0
+            state.pagination = { page: 1, pages: 1, total: 0 }
             state.isNotificationLoading = false
             state.isNotificationError = false
             state.isNotificationSuccess = false
@@ -127,124 +68,57 @@ const notificationSlice = createSlice({
     },
     extraReducers: (builder) => {
         builder
-            // 🔹 Get Notifications
-            // .addCase(getNotifications.pending, (state) => {
-            //     state.isNotificationLoading = true
-            // })
             .addCase(getNotifications.fulfilled, (state, action) => {
                 state.isNotificationLoading = false
-                state.isNotificationSuccess = true
-
-                state.notifications = action.payload
-                showMessage({
-                    message: 'Notification Found successfully!',
-                    type: 'success',
-                })
+                // Logic: If page 1, replace. If page > 1, append.
+                const { notifications, unreadCount, pagination } =
+                    action.payload
+                if (pagination.page === 1) {
+                    state.notifications = notifications
+                } else {
+                    state.notifications = [
+                        ...state.notifications,
+                        ...notifications,
+                    ]
+                }
+                state.unreadCount = unreadCount
+                state.pagination = pagination
             })
-            // .addCase(getNotifications.rejected, (state, action) => {
-            //     state.isNotificationLoading = false
-            //     state.isNotificationError = true
-            //     state.notificationMessage = action.payload
-            //     showMessage({ message: action.payload, type: 'danger' })
-            // })
-
-            // 🔹 Send Notification
-            .addCase(sendNotification.fulfilled, (state, action) => {
-                state.isNotificationSuccess = true
-                state.notifications.unshift(action.payload.notification)
-                showMessage({
-                    message: 'Notification sent successfully!',
-                    type: 'success',
-                })
-            })
-
-            // 🔹 Send to All
-            .addCase(sendNotificationToAll.fulfilled, (state) => {
-                state.isNotificationSuccess = true
-                showMessage({
-                    message: 'Notification sent to all users!',
-                    type: 'success',
-                })
-            })
-
-            // 🔹 Mark as Read
-            .addCase(markAsRead.fulfilled, (state, action) => {
-                const idx = state.notifications.findIndex(
-                    (n) => n._id === action.payload._id
+            .addCase(markNotificationsRead.fulfilled, (state, action) => {
+                const ids = action.meta.arg
+                state.notifications = state.notifications.map((n) =>
+                    ids.includes(n._id) ? { ...n, isRead: true } : n
                 )
-                if (idx !== -1) state.notifications[idx] = action.payload
+                state.unreadCount = Math.max(0, state.unreadCount - ids.length)
             })
-
-            // 🔹 Delete Notification
-            .addCase(deleteNotification.fulfilled, (state, action) => {
-                state.notifications = state.notifications.filter(
-                    (n) => n._id !== action.payload
-                )
-                showMessage({
-                    message: 'Notification deleted',
-                    type: 'success',
-                })
+            .addCase(markAllNotificationsRead.fulfilled, (state) => {
+                state.notifications = state.notifications.map((n) => ({
+                    ...n,
+                    isRead: true,
+                }))
+                state.unreadCount = 0
             })
-
-            // 🔹 FCM token registration/unregistration
-            .addCase(registerFCMToken.fulfilled, (state) => {
-                state.isNotificationSuccess = true
-            })
-            .addCase(unregisterFCMToken.fulfilled, (state) => {
-                state.isNotificationSuccess = true
-            })
-
-            // 🔹 Matchers for Loading & Errors
             .addMatcher(
                 (action) =>
                     action.type.startsWith('notifications/') &&
                     action.type.endsWith('/pending'),
                 (state) => {
                     state.isNotificationLoading = true
-                    state.isNotificationError = false
-                    state.isNotificationSuccess = false
-                    state.notificationMessage = ''
                 }
             )
-            // .addMatcher(
-            //     (action) =>
-            //         action.type.startsWith('notifications/') &&
-            //         action.type.endsWith('/rejected'),
-            //     (state, action) => {
-            //         state.isNotificationLoading = false
-            //         state.isNotificationError = true
-            //         state.isNotificationSuccess = false
-            //         state.notificationMessage = action.payload
-            //         showMessage({ message: action.payload, type: 'danger' })
-            //     }
-            // )
-            // src/features/notifications/notificationSlice.js
-
             .addMatcher(
                 (action) =>
                     action.type.startsWith('notifications/') &&
                     action.type.endsWith('/rejected'),
                 (state, action) => {
-                    // ... (other state updates)
-
-                    // ✅ This correctly normalizes action.payload into a string message (msg)
+                    state.isNotificationLoading = false
+                    state.isNotificationError = true
                     const msg =
                         typeof action.payload === 'string'
                             ? action.payload
-                            : action.payload?.message &&
-                                typeof action.payload.message === 'string'
-                              ? action.payload.message
-                              : JSON.stringify(
-                                    action.payload?.message ||
-                                        'Something went wrong'
-                                )
-
+                            : 'Something went wrong'
                     state.notificationMessage = msg
-
-                    showMessage({
-                        message: msg, // ✅ Now passing a guaranteed STRING
-                        type: 'danger',
-                    })
+                    showMessage({ message: msg, type: 'danger' })
                 }
             )
     },

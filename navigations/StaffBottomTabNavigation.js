@@ -1,21 +1,19 @@
 import React, { useMemo } from 'react'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { Platform, StyleSheet, View } from 'react-native'
+import { Platform, StyleSheet } from 'react-native'
 import { useSelector } from 'react-redux'
 import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityIcons'
+import { useTheme } from '../theme/ThemeProvider' // Added theme hook
+import { COLORS } from '../constants'
 
 // Screens
 import StaffDashboardScreen from '../screens/Staff/StaffDashboardScreen'
 import StaffOrdersScreen from '../screens/Staff/StaffOrdersScreen'
 import StaffScanScreen from '../screens/Staff/StaffScannerScreen'
 import StaffProfileScreen from '../screens/Staff/StaffProfileScreen'
-import StaffNotificationsScreen from '../screens/Staff/StaffNotificationsScreen.js' // New Notifications Screen
+import StaffNotificationsScreen from '../screens/Staff/StaffNotificationsScreen.js'
 
 const Tab = createBottomTabNavigator()
-
-/* =====================================================
-   TAB CONFIG (Clean + Scalable)
-   ===================================================== */
 
 const TAB_CONFIG = [
     {
@@ -35,8 +33,7 @@ const TAB_CONFIG = [
     },
     {
         name: 'Notifications',
-        component: StaffNotificationsScreen, // New Notifications Screen
-        // component: StaffProfileScreen, // New Notifications Screen
+        component: StaffNotificationsScreen,
         icon: { active: 'bell', inactive: 'bell-outline' },
     },
     {
@@ -46,12 +43,8 @@ const TAB_CONFIG = [
     },
 ]
 
-/* =====================================================
-   MAIN COMPONENT
-   ===================================================== */
-
 const StaffBottomTabNavigation = () => {
-    // Example: dynamic badge from Redux
+    const { colors, dark } = useTheme()
     const pendingOrders = useSelector(
         (state) => state.purchase?.pendingOrdersCount
     )
@@ -59,13 +52,19 @@ const StaffBottomTabNavigation = () => {
     const screenOptions = useMemo(
         () => ({
             headerShown: false,
-            tabBarActiveTintColor: '#004AAD',
-            tabBarInactiveTintColor: '#9DA3B4',
+            tabBarActiveTintColor: dark ? '#58A6FF' : '#004AAD',
+            tabBarInactiveTintColor: dark ? '#8E8E93' : '#9DA3B4',
             tabBarShowLabel: true,
             tabBarLabelStyle: styles.tabLabel,
-            tabBarStyle: styles.tabBar,
+            tabBarStyle: [
+                styles.tabBar,
+                {
+                    backgroundColor: dark ? '#1C1C1E' : '#FFFFFF',
+                    shadowOpacity: dark ? 0.3 : 0.08,
+                },
+            ],
         }),
-        []
+        [dark, colors]
     )
 
     return (
@@ -76,19 +75,17 @@ const StaffBottomTabNavigation = () => {
                     name={tab.name}
                     component={tab.component}
                     options={{
-                        tabBarIcon: ({ focused, color }) => {
-                            const iconName = focused
-                                ? tab.icon.active
-                                : tab.icon.inactive
-
-                            return (
-                                <MaterialCommunityIcons
-                                    name={iconName}
-                                    size={24}
-                                    color={color}
-                                />
-                            )
-                        },
+                        tabBarIcon: ({ focused, color }) => (
+                            <MaterialCommunityIcons
+                                name={
+                                    focused
+                                        ? tab.icon.active
+                                        : tab.icon.inactive
+                                }
+                                size={24}
+                                color={color}
+                            />
+                        ),
                         tabBarBadge:
                             tab.name === 'Orders' && pendingOrders > 0
                                 ? pendingOrders
@@ -101,33 +98,19 @@ const StaffBottomTabNavigation = () => {
     )
 }
 
-export default StaffBottomTabNavigation
-
-/* =====================================================
-   STYLES
-   ===================================================== */
-
 const styles = StyleSheet.create({
     tabBar: {
         position: 'absolute',
         height: Platform.OS === 'ios' ? 90 : 70,
         paddingBottom: Platform.OS === 'ios' ? 28 : 10,
         paddingTop: 8,
-        backgroundColor: '#FFFFFF',
         borderTopWidth: 0,
         elevation: 15,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.08,
         shadowRadius: 12,
     },
-
-    tabLabel: {
-        fontSize: 11,
-        fontWeight: '600',
-        marginTop: -2,
-    },
-
+    tabLabel: { fontSize: 11, fontWeight: '600', marginTop: -2 },
     badge: {
         backgroundColor: '#E53935',
         fontSize: 10,
@@ -138,3 +121,5 @@ const styles = StyleSheet.create({
         lineHeight: 16,
     },
 })
+
+export default StaffBottomTabNavigation

@@ -1,3 +1,4 @@
+import React, { useRef } from 'react'
 import {
     View,
     Text,
@@ -5,243 +6,304 @@ import {
     TouchableOpacity,
     Image,
     Switch,
+    Pressable,
 } from 'react-native'
-import React, { useState, useRef } from 'react'
-import { COLORS, SIZES, icons, images } from '../constants'
+import { COLORS, icons, images } from '../constants'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ScrollView } from 'react-native-virtualized-view'
-import { MaterialIcons, Ionicons, Feather } from '@expo/vector-icons'
-import SettingsItem from '../components/SettingsItem'
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useTheme } from '../theme/ThemeProvider'
 import RBSheet from 'react-native-raw-bottom-sheet'
 import Button from '../components/Button'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import { logout } from '../redux/features/Auth/AuthSlice'
+import HelpCenter from './HelpCenter'
 
 const Menu = ({ navigation }) => {
     const dispatch = useDispatch()
     const refRBSheet = useRef()
-    const { dark, colors, setScheme } = useTheme()
+    const { dark, setScheme } = useTheme()
+    const { user } = useSelector((state) => state.auth)
 
     const handleLogout = async () => {
         try {
             await dispatch(logout()).unwrap()
+            // refRBSheet.current.close()
         } catch (error) {
             console.error('Logout failed', error)
         }
     }
 
-    const renderHeader = () => (
-        <View style={styles.headerContainer}>
-            <View style={styles.headerLeft}>
-                <Image
-                    source={images.logo}
-                    resizeMode="contain"
-                    style={styles.logo}
-                />
-                <Text
+    // Refined Row Component for Giant-style UI
+    const ActionRow = ({
+        icon,
+        label,
+        value,
+        onPress,
+        isLast,
+        type = 'nav',
+    }) => (
+        <Pressable
+            onPress={onPress}
+            style={({ pressed }) => [
+                styles.row,
+                pressed && styles.rowPressed,
+                isLast && { borderBottomWidth: 0 },
+            ]}
+        >
+            <View style={styles.rowLeft}>
+                <View
                     style={[
-                        styles.headerTitle,
-                        { color: dark ? COLORS.white : COLORS.greyscale900 },
+                        styles.iconContainer,
+                        { backgroundColor: dark ? '#1C1C1E' : '#F2F2F7' },
                     ]}
                 >
-                    Menu
+                    {icon}
+                </View>
+                <Text
+                    style={[
+                        styles.rowLabel,
+                        { color: dark ? COLORS.white : '#1C1C1E' },
+                    ]}
+                >
+                    {label}
                 </Text>
             </View>
-        </View>
+            <View style={styles.rowRight}>
+                {type === 'nav' && (
+                    <Feather
+                        name="chevron-right"
+                        size={18}
+                        color={COLORS.greyscale500}
+                    />
+                )}
+                {type === 'switch' && (
+                    <Switch
+                        value={value}
+                        onValueChange={onPress}
+                        trackColor={{ false: '#D1D1D6', true: '#34C759' }}
+                        thumbColor={COLORS.white}
+                    />
+                )}
+            </View>
+        </Pressable>
     )
 
     return (
         <SafeAreaView
-            style={[styles.area, { backgroundColor: colors.background }]}
+            style={[
+                styles.area,
+                { backgroundColor: dark ? COLORS.black : '#F2F2F7' },
+            ]}
         >
-            <View style={styles.container}>
-                {renderHeader()}
-                <ScrollView showsVerticalScrollIndicator={false}>
-                    {/* Compact Profile Summary */}
+            <ScrollView
+                showsVerticalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+            >
+                {/* Minimalist Header */}
+                <View style={styles.header}>
+                    <Text
+                        style={[
+                            styles.headerTitle,
+                            { color: dark ? COLORS.white : '#000' },
+                        ]}
+                    >
+                        Account
+                    </Text>
                     <TouchableOpacity
-                        style={styles.miniProfile}
                         onPress={() => navigation.navigate('Profile')}
                     >
                         <Image
-                            source={images.user1}
-                            style={styles.miniAvatar}
+                            source={
+                                user?.avatar
+                                    ? { uri: user.avatar }
+                                    : images.user1
+                            }
+                            style={styles.headerAvatar}
                         />
-                        <View style={{ flex: 1, marginLeft: 12 }}>
+                    </TouchableOpacity>
+                </View>
+
+                {/* Account Overview Card */}
+                <View
+                    style={[
+                        styles.glassCard,
+                        { backgroundColor: dark ? '#1C1C1E' : COLORS.white },
+                    ]}
+                >
+                    <View style={styles.profileSection}>
+                        <View>
                             <Text
                                 style={[
                                     styles.nameText,
-                                    {
-                                        color: dark
-                                            ? COLORS.white
-                                            : COLORS.greyscale900,
-                                    },
+                                    { color: dark ? COLORS.white : '#000' },
                                 ]}
                             >
-                                Nathalie Erneson
+                                {user?.name || 'Guest User'}
                             </Text>
-                            <Text style={styles.viewProfileText}>
-                                View profile & account details
+                            <Text style={styles.emailText}>
+                                {user?.email || 'Standard Member'}
                             </Text>
                         </View>
-                        <MaterialIcons
-                            name="chevron-right"
-                            size={24}
-                            color={COLORS.greyscale500}
-                        />
-                    </TouchableOpacity>
+                        <View style={styles.statusBadge}>
+                            <Text style={styles.statusText}>VERIFIED</Text>
+                        </View>
+                    </View>
+                </View>
 
-                    <View style={styles.sectionDivider} />
-
-                    {/* --- SHOPPING SECTION --- */}
-                    <Text style={styles.sectionLabel}>Shopping</Text>
-
-                    <SettingsItem
-                        icon={icons.document}
-                        name="All Products"
-                        onPress={() => navigation.navigate('AllProducts')}
+                {/* Section: Activity */}
+                <Text style={styles.groupLabel}>Activity</Text>
+                <View
+                    style={[
+                        styles.groupCard,
+                        { backgroundColor: dark ? '#1C1C1E' : COLORS.white },
+                    ]}
+                >
+                    <ActionRow
+                        icon={
+                            <Feather
+                                name="package"
+                                size={18}
+                                color={dark ? COLORS.white : '#48484A'}
+                            />
+                        }
+                        label="Order History"
+                        onPress={() => navigation.navigate('Orders')}
                     />
-                    <SettingsItem
-                        icon={icons.more}
-                        name="Categories"
-                        onPress={() => navigation.navigate('Categories')}
-                    />
-                    <SettingsItem
-                        icon={icons.calendar}
-                        name="My Orders"
-                        onPress={() => navigation.navigate('MyBookings')}
-                    />
-                    {/* <SettingsItem
-                        icon={icons.heart2}
-                        name="Wishlist"
-                        onPress={() => navigation.navigate('Search')} // Assuming search handles filters
+                    {/* <ActionRow
+                        icon={
+                            <Feather
+                                name="heart"
+                                size={18}
+                                color={dark ? COLORS.white : '#48484A'}
+                            />
+                        }
+                        label="Wishlist"
+                        onPress={() => {}}
+                        isLast
                     /> */}
+                </View>
 
-                    <View style={styles.sectionDivider} />
-
-                    {/* --- PREFERENCES SECTION --- */}
-                    <Text style={styles.sectionLabel}>Preferences</Text>
-                    <SettingsItem
-                        icon={icons.bell2}
-                        name="Notification"
+                {/* Section: Preferences */}
+                <Text style={styles.groupLabel}>Preferences</Text>
+                <View
+                    style={[
+                        styles.groupCard,
+                        { backgroundColor: dark ? '#1C1C1E' : COLORS.white },
+                    ]}
+                >
+                    {/* <ActionRow
+                        icon={
+                            <Feather
+                                name="bell"
+                                size={18}
+                                color={dark ? COLORS.white : '#48484A'}
+                            />
+                        }
+                        label="Notifications"
                         onPress={() =>
                             navigation.navigate('SettingsNotifications')
                         }
-                    />
-
-                    {/* Dark Mode Toggle Row */}
-                    <View style={styles.customRow}>
-                        <View style={styles.leftRow}>
-                            <Image
-                                source={icons.show}
-                                style={[
-                                    styles.rowIcon,
-                                    {
-                                        tintColor: dark
-                                            ? COLORS.white
-                                            : COLORS.greyscale900,
-                                    },
-                                ]}
+                    /> */}
+                    <ActionRow
+                        type="switch"
+                        value={dark}
+                        icon={
+                            <Feather
+                                name={dark ? 'moon' : 'sun'}
+                                size={18}
+                                color={dark ? COLORS.white : '#48484A'}
                             />
-                            <Text
-                                style={[
-                                    styles.rowLabel,
-                                    {
-                                        color: dark
-                                            ? COLORS.white
-                                            : COLORS.greyscale900,
-                                    },
-                                ]}
-                            >
-                                Dark Mode
-                            </Text>
-                        </View>
-                        <Switch
-                            value={dark}
-                            onValueChange={() =>
-                                setScheme(dark ? 'light' : 'dark')
-                            }
-                            trackColor={{
-                                false: '#EEEEEE',
-                                true: COLORS.primary,
-                            }}
-                        />
-                    </View>
-
-                    <View style={styles.sectionDivider} />
-
-                    {/* --- SUPPORT & LEGAL --- */}
-                    <Text style={styles.sectionLabel}>Support & Legal</Text>
-                    <SettingsItem
-                        icon={icons.shieldOutline}
-                        name="Security"
-                        onPress={() => navigation.navigate('SettingsSecurity')}
-                    />
-                    <SettingsItem
-                        icon={icons.help}
-                        name="Help Center"
-                        onPress={() => navigation.navigate('HelpCenter')}
-                    />
-                    <SettingsItem
-                        icon={icons.lockedComputerOutline}
-                        name="Privacy Policy"
-                        onPress={() =>
-                            navigation.navigate('SettingsPrivacyPolicy')
                         }
+                        label="Dark Appearance"
+                        onPress={() => setScheme(dark ? 'light' : 'dark')}
+                        isLast
                     />
+                </View>
 
-                    <TouchableOpacity
-                        onPress={() => refRBSheet.current.open()}
-                        style={styles.simpleLogout}
-                    >
-                        <MaterialIcons
-                            name="logout"
-                            size={22}
-                            color={COLORS.red}
-                        />
-                        <Text style={styles.simpleLogoutText}>Logout</Text>
-                    </TouchableOpacity>
+                {/* Section: Support */}
+                <Text style={styles.groupLabel}>Support</Text>
+                <View
+                    style={[
+                        styles.groupCard,
+                        { backgroundColor: dark ? '#1C1C1E' : COLORS.white },
+                    ]}
+                >
+                    <ActionRow
+                        icon={
+                            <Feather
+                                name="shield"
+                                size={18}
+                                color={dark ? COLORS.white : '#48484A'}
+                            />
+                        }
+                        label="Privacy & Security"
+                        onPress={() => {}}
+                    />
+                    <ActionRow
+                        icon={
+                            <Feather
+                                name="help-circle"
+                                size={18}
+                                color={dark ? COLORS.white : '#48484A'}
+                            />
+                        }
+                        label="Help Center"
+                        // onPress={() => {HelpCenter}}
+                        onPress={() => navigation.navigate('HelpCenter')}
+                        isLast
+                    />
+                </View>
 
-                    <View style={{ height: 100 }} />
-                </ScrollView>
-            </View>
+                <TouchableOpacity
+                    onPress={() => refRBSheet.current.open()}
+                    style={styles.signOutBtn}
+                >
+                    <Text style={styles.signOutText}>Sign Out</Text>
+                </TouchableOpacity>
 
-            {/* Logout Bottom Sheet */}
+                <Text style={styles.versionText}>
+                    Version 2.4.0 (Build 102)
+                </Text>
+            </ScrollView>
+
             <RBSheet
                 ref={refRBSheet}
                 closeOnDragDown={true}
-                height={260}
+                height={220}
                 customStyles={{
                     container: {
-                        borderTopRightRadius: 32,
-                        borderTopLeftRadius: 32,
-                        backgroundColor: dark ? COLORS.dark2 : COLORS.white,
+                        borderTopRightRadius: 28,
+                        borderTopLeftRadius: 28,
+                        backgroundColor: dark ? '#1C1C1E' : COLORS.white,
                     },
                 }}
             >
-                <Text style={styles.bottomTitle}>Logout</Text>
-                <View style={styles.separateLine} />
-                <Text
-                    style={[
-                        styles.bottomSubtitle,
-                        { color: dark ? COLORS.white : COLORS.black },
-                    ]}
-                >
-                    Are you sure you want to log out?
-                </Text>
-                <View style={styles.bottomContainer}>
-                    <Button
-                        title="Cancel"
-                        style={styles.cancelBtn}
-                        textColor={dark ? COLORS.white : COLORS.primary}
-                        onPress={() => refRBSheet.current.close()}
-                    />
-                    <Button
-                        title="Yes, Logout"
-                        filled
-                        style={styles.logoutBtnAction}
-                        onPress={handleLogout}
-                    />
+                <View style={styles.sheetContent}>
+                    <Text
+                        style={[
+                            styles.sheetTitle,
+                            { color: dark ? COLORS.white : '#000' },
+                        ]}
+                    >
+                        Sign Out?
+                    </Text>
+                    <View style={styles.sheetOptions}>
+                        <Pressable
+                            style={styles.cancelBtn}
+                            onPress={() => refRBSheet.current.close()}
+                        >
+                            <Text style={styles.cancelText}>
+                                Stay Logged In
+                            </Text>
+                        </Pressable>
+                        <Pressable
+                            style={styles.confirmBtn}
+                            onPress={handleLogout}
+                        >
+                            <Text style={styles.confirmText}>Sign Out</Text>
+                        </Pressable>
+                    </View>
                 </View>
             </RBSheet>
         </SafeAreaView>
@@ -250,85 +312,117 @@ const Menu = ({ navigation }) => {
 
 const styles = StyleSheet.create({
     area: { flex: 1 },
-    container: { flex: 1, paddingHorizontal: 16 },
-    headerContainer: {
-        paddingVertical: 15,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    logo: { height: 28, width: 28, tintColor: COLORS.primary },
-    headerTitle: { fontSize: 22, fontFamily: 'bold', marginLeft: 12 },
-    miniProfile: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 20,
-    },
-    miniAvatar: { width: 50, height: 50, borderRadius: 25 },
-    nameText: { fontSize: 18, fontFamily: 'bold' },
-    viewProfileText: { fontSize: 13, color: COLORS.greyscale600, marginTop: 2 },
-    sectionDivider: {
-        height: 1,
-        backgroundColor: COLORS.grayscale200,
-        marginVertical: 10,
-    },
-    sectionLabel: {
-        fontSize: 12,
-        fontFamily: 'bold',
-        color: COLORS.greyscale500,
-        textTransform: 'uppercase',
-        marginVertical: 15,
-        letterSpacing: 1,
-    },
-    customRow: {
+    scrollContent: { paddingHorizontal: 16, paddingBottom: 40 },
+    header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingVertical: 12,
-        paddingHorizontal: 5,
+        marginTop: 20,
+        marginBottom: 25,
     },
-    leftRow: { flexDirection: 'row', alignItems: 'center' },
-    rowIcon: { width: 20, height: 20 },
-    rowLabel: { fontSize: 16, fontFamily: 'semiBold', marginLeft: 15 },
-    simpleLogout: {
+    headerTitle: { fontSize: 34, fontFamily: 'bold', letterSpacing: -1 },
+    headerAvatar: { width: 40, height: 40, borderRadius: 20 },
+
+    // Cards
+    glassCard: {
+        padding: 20,
+        borderRadius: 24,
+        marginBottom: 25,
+    },
+    groupCard: {
+        borderRadius: 20,
+        overflow: 'hidden',
+        marginBottom: 25,
+    },
+    profileSection: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    nameText: { fontSize: 22, fontFamily: 'bold', letterSpacing: -0.5 },
+    emailText: { fontSize: 14, color: '#8E8E93', marginTop: 4 },
+    statusBadge: {
+        backgroundColor: '#34C75915',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+    },
+    statusText: {
+        color: '#34C759',
+        fontSize: 10,
+        fontFamily: 'bold',
+        letterSpacing: 1,
+    },
+
+    // Grouping
+    groupLabel: {
+        fontSize: 13,
+        color: '#8E8E93',
+        textTransform: 'uppercase',
+        marginLeft: 16,
+        marginBottom: 8,
+        letterSpacing: 0.5,
+    },
+
+    // Rows
+    row: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 30,
-        paddingVertical: 10,
-    },
-    simpleLogoutText: {
-        color: COLORS.red,
-        fontSize: 18,
-        fontFamily: 'semiBold',
-        marginLeft: 12,
-    },
-    bottomTitle: {
-        fontSize: 22,
-        fontFamily: 'bold',
-        color: COLORS.red,
-        textAlign: 'center',
-        marginTop: 12,
-    },
-    bottomSubtitle: { fontSize: 16, textAlign: 'center', marginVertical: 20 },
-    bottomContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-around',
+        justifyContent: 'space-between',
+        paddingVertical: 12,
         paddingHorizontal: 16,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#38383A20',
     },
+    rowPressed: { backgroundColor: '#38383A10' },
+    rowLeft: { flexDirection: 'row', alignItems: 'center' },
+    iconContainer: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    rowLabel: { fontSize: 16, marginLeft: 14, fontFamily: 'medium' },
+
+    // Sign Out
+    signOutBtn: {
+        marginTop: 10,
+        alignItems: 'center',
+        paddingVertical: 18,
+        borderRadius: 20,
+        backgroundColor: '#FF3B3010',
+    },
+    signOutText: { color: '#FF3B30', fontSize: 16, fontFamily: 'bold' },
+    versionText: {
+        textAlign: 'center',
+        color: '#8E8E93',
+        fontSize: 12,
+        marginTop: 30,
+    },
+
+    // Sheet
+    sheetContent: { padding: 24, alignItems: 'center' },
+    sheetTitle: { fontSize: 20, fontFamily: 'bold', marginBottom: 30 },
+    sheetOptions: { flexDirection: 'row', gap: 12 },
     cancelBtn: {
-        width: '45%',
-        borderRadius: 32,
-        backgroundColor: COLORS.grayscale200,
+        flex: 1,
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 14,
+        backgroundColor: '#8E8E9320',
     },
-    logoutBtnAction: {
-        width: '45%',
-        borderRadius: 32,
-        backgroundColor: COLORS.primary,
+    confirmBtn: {
+        flex: 1,
+        height: 50,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 14,
+        backgroundColor: '#FF3B30',
     },
-    separateLine: {
-        height: 1,
-        backgroundColor: COLORS.grayscale200,
-        marginTop: 15,
-    },
+    cancelText: { fontWeight: '600' },
+    confirmText: { color: 'white', fontWeight: 'bold' },
 })
 
 export default Menu

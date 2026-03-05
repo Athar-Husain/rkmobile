@@ -1,158 +1,241 @@
-// screens/Home.js
-
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useMemo, useCallback } from 'react'
 import {
-    View,
     ScrollView,
     StyleSheet,
+    View,
+    SafeAreaView,
+    StatusBar,
+    ActivityIndicator,
+    RefreshControl,
+    Text,
     Platform,
-    Dimensions,
 } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-
-import { images, COLORS, SIZES, icons } from '../constants'
-import { useTheme } from '../theme/ThemeProvider'
-import HomeHeader from '../containers/Header'
-import BannerCarousel from '../containers/Home/BannerCarousel'
-import UserConnectionSection from '../containers/Home/UserConnectionSection'
-import OverviewCards from '../containers/Home/OverviewCards'
-import FeaturedPlansSection from '../containers/Home/FeaturedPlansSection'
-import ConnectionModal from '../containers/Home/ConnectionModal'
-import { banners, categories, mostPopularServices } from '../data'
-
 import { useDispatch, useSelector } from 'react-redux'
-import { getActiveConnection } from '../redux/features/Connection/ConnectionSlice'
-import { useFocusEffect } from '@react-navigation/native'
+import { useTheme } from '../theme/ThemeProvider'
 
-const BOTTOM_NAV_HEIGHT = Platform.OS === 'ios' ? 90 : 60
+// Actions
+import {
+    fetchActiveBanners,
+    fetchActivePromotions,
+} from '../redux/features/Home/HomeSlice'
+import {
+    fetchActiveCoupons,
+    fetchDiscoverCoupons,
+} from '../redux/features/Coupons/CouponSlice'
+import { fetchPromotionsForUser } from '../redux/features/Promotion/PromotionSlice'
+import { fetchFeaturedProducts } from '../redux/features/Products/ProductSlice'
 
-const { width } = Dimensions.get('window')
-const CARD_WIDTH = (width - 48) / 2
+// Components
+import Header from '../containers/Header'
+import PromotionCarousel from '../containers/Home/PromotionCarousel'
+import PromoBanner from '../containers/Home/PromoBanner'
+import CouponCarousel from '../containers/Home/CouponCarousel'
+import ProductGrid from '../containers/Home/ProductGrid'
+import { COLORS, SIZES } from '../constants'
 
 const Home = ({ navigation }) => {
-    const { colors } = useTheme()
     const dispatch = useDispatch()
+    const { colors, dark } = useTheme()
 
-    // const connection = useSelector((state) => state.connection)
-    const {
-        connections,
-        connection,
-        isConnectionLoading,
-        isConnectionError,
-        message,
-    } = useSelector((state) => state.connection)
-
-    const [modalVisible, setModalVisible] = useState(false)
-
-    useFocusEffect(
-        useCallback(() => {
-            dispatch(getActiveConnection())
-        }, [dispatch])
+    // Selectors
+    const { activeBanners, isLoading: homeLoading } = useSelector(
+        (state) => state.home
+    )
+    const { activeCoupons, discoverCoupons, isCouponLoading } = useSelector(
+        (state) => state.coupon
+    )
+    const { promotions, isPromotionLoading } = useSelector(
+        (state) => state.promotions
+    )
+    const { featuredProducts, isFetchingFeatured } = useSelector(
+        (state) => state.product
     )
 
-    // If you want to show in header etc
-    const handleSwitchConnection = useCallback(() => {
-        setModalVisible(false)
-        navigation.navigate('Connections', {
-            // avoid passing function if it causes non-serializable warnings
-            // maybe pass connection aliasName and then update in a global state
-        })
-    }, [navigation])
+    /**
+     * PRODUCTION LOGIC: Refined Loading States
+     * We only show a full-screen loader on the VERY first launch.
+     * Subsequent updates use the RefreshControl for a smoother experience.
+     */
+    const hasData = featuredProducts?.length > 0 || promotions?.length > 0
+    const isInitialLoading = !hasData && (isFetchingFeatured || homeLoading)
 
-    // Build overviewData dynamically from connection
-    const overviewData = useMemo(() => {
-        if (!connection) return []
+    const isRefreshing = useMemo(
+        () =>
+            homeLoading ||
+            isCouponLoading ||
+            isPromotionLoading ||
+            isFetchingFeatured,
+        [homeLoading, isCouponLoading, isPromotionLoading, isFetchingFeatured]
+    )
 
-        return [
-            {
-                id: 1,
-                title: 'Connection Status',
-                value: connection.connectionStatus ?? 'Unknown',
-                icon: icons.wifi,
-                bg: COLORS.primary,
-            },
-            {
-                id: 2,
-                title: 'Plan Price',
-                value: `₹${connection.activePlan?.price ?? '--'}`,
-                icon: icons.wallet,
-                bg: '#6C63FF',
-            },
-            {
-                id: 3,
-                title: 'Plan Status',
-                value: connection.activePlan?.status ?? '--',
-                icon: icons.infoCircle,
-                bg: '#FF6B6B',
-            },
-            {
-                id: 4,
-                title: 'Plan Duration',
-                value:
-                    connection.activePlan?.duration != null
-                        ? `${connection.activePlan.duration} days`
-                        : '--',
-                icon: icons.box,
-                bg: '#3DD598',
-            },
-            {
-                id: 5,
-                title: 'Region',
-                value: connection.serviceArea?.region ?? '--',
-                icon: icons.ticket,
-                bg: '#FEC260',
-            },
-            {
-                id: 6,
-                title: 'Installed On',
-                value: connection.installedAt
-                    ? new Date(connection.installedAt).toLocaleDateString()
-                    : '--',
-                icon: icons.check,
-                bg: '#4D9DE0',
-            },
-        ]
-    }, [connection, icons, COLORS])
+    const loadAllData = useCallback(() => {
+        // Dispatching all in parallel
+        return Promise.all([
+            dispatch(fetchActiveBanners()),
+            dispatch(fetchActivePromotions()),
+            dispatch(fetchActiveCoupons()),
+            dispatch(fetchDiscoverCoupons()),
+            dispatch(fetchPromotionsForUser()),
+            dispatch(fetchFeaturedProducts()),
+        ])
+    }, [dispatch])
+
+    useEffect(() => {
+        loadAllData()
+    }, [loadAllData])
+
+    // Optimize Coupon Data (Remove duplicates by ID)
+    const uniqueCoupons = useMemo(() => {
+        const combined = [...(activeCoupons || []), ...(discoverCoupons || [])]
+        return Array.from(
+            new Map(
+                combined.map((item) => [item._id || item.id, item])
+            ).values()
+        )
+    }, [activeCoupons, discoverCoupons])
+
+    // Handle Product Navigation
+    const handleProductPress = useCallback(
+        (item) => {
+            navigation.navigate('ProductDetails', { id: item._id || item.id })
+        },
+        [navigation]
+    )
+
+    if (isInitialLoading) {
+        return (
+            <SafeAreaView
+                style={[styles.center, { backgroundColor: colors.background }]}
+            >
+                <ActivityIndicator size="large" color={COLORS.primary} />
+                <Text
+                    style={[styles.loadingText, { color: colors.grayscale700 }]}
+                >
+                    Curating your experience...
+                </Text>
+            </SafeAreaView>
+        )
+    }
 
     return (
         <SafeAreaView
-            style={[styles.area, { backgroundColor: colors.background }]}
+            style={[styles.container, { backgroundColor: colors.background }]}
         >
+            <StatusBar
+                barStyle={dark ? 'light-content' : 'dark-content'}
+                backgroundColor={colors.background}
+            />
+
+            <Header />
+
             <ScrollView
                 showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingBottom: BOTTOM_NAV_HEIGHT }}
-                style={styles.container}
+                contentContainerStyle={styles.scrollContent}
+                removeClippedSubviews={Platform.OS === 'android'} // Performance boost for long lists
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={loadAllData}
+                        colors={[COLORS.primary]}
+                        tintColor={COLORS.primary}
+                    />
+                }
             >
-                <HomeHeader navigation={navigation} />
-                <BannerCarousel
-                    banners={banners}
-                    currentIndex={0}
-                    setCurrentIndex={() => {}}
-                />
-                <UserConnectionSection onPress={() => setModalVisible(true)} />
-                <OverviewCards data={overviewData} />
-                <FeaturedPlansSection
-                    // data={[] /* replace with real data */}
-                    onPressSeeAll={() => navigation.navigate('Plans')}
-                />
+                {/* Promotions Section */}
+                {promotions?.length > 0 && (
+                    <View style={styles.section}>
+                        <PromotionCarousel data={promotions} />
+                    </View>
+                )}
+
+                {/* Coupons Section */}
+                <View style={styles.section}>
+                    <CouponCarousel
+                        data={uniqueCoupons}
+                        onViewAll={() => navigation.navigate('Coupons')}
+                    />
+                </View>
+
+                {/* Dynamic Banners */}
+                {activeBanners?.length > 0 && (
+                    <View style={styles.bannerSection}>
+                        <PromoBanner data={activeBanners} />
+                    </View>
+                )}
+
+                {/* Featured Products Grid */}
+                <View style={styles.productSection}>
+                    <View style={styles.sectionHeader}>
+                        <Text
+                            style={[
+                                styles.sectionTitle,
+                                { color: colors.text },
+                            ]}
+                        >
+                            Featured for You
+                        </Text>
+                        <Text
+                            style={[
+                                styles.sectionSubtitle,
+                                { color: colors.grayscale700 },
+                            ]}
+                        >
+                            Handpicked premium products
+                        </Text>
+                    </View>
+
+                    <ProductGrid
+                        products={featuredProducts}
+                        onProductPress={handleProductPress}
+                    />
+                </View>
+
+                {/* Bottom Spacer for TabBar visibility */}
+                <View style={{ height: 80 }} />
             </ScrollView>
-            <ConnectionModal
-                visible={modalVisible}
-                onClose={() => setModalVisible(false)}
-                connectionDetails={connection}
-                onSwitchConnection={handleSwitchConnection}
-            />
         </SafeAreaView>
     )
 }
 
 const styles = StyleSheet.create({
-    area: {
-        flex: 1,
-    },
     container: {
         flex: 1,
-        paddingHorizontal: 16,
+    },
+    center: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        marginTop: 15,
+        fontSize: 14,
+        fontWeight: '500',
+        letterSpacing: 0.5,
+    },
+    scrollContent: {
+        paddingBottom: SIZES.padding,
+    },
+    section: {
+        marginBottom: 10,
+    },
+    bannerSection: {
+        marginVertical: 10,
+        paddingHorizontal: 0,
+    },
+    productSection: {
+        marginTop: 10,
+    },
+    sectionHeader: {
+        paddingHorizontal: 20,
+        marginBottom: 15,
+    },
+    sectionTitle: {
+        fontSize: 22,
+        fontWeight: '800',
+    },
+    sectionSubtitle: {
+        fontSize: 13,
+        marginTop: 2,
     },
 })
 
